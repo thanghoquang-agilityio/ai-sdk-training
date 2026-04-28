@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { MockLanguageModelV3 } from "ai/test";
 import { routeConversation } from "@/agents/chat-core/services/coordinator";
 import type { MockAuthSession } from "@/lib/auth/session";
 
-/**
- * Creates session.
- * @param {MockAuthSession["role"]} role
- * @returns {MockAuthSession}
- */
 function createSession(role: MockAuthSession["role"]): MockAuthSession {
   return {
     sessionId: `${role}-session`,
@@ -50,8 +46,23 @@ function createSession(role: MockAuthSession["role"]): MockAuthSession {
   };
 }
 
-test("routes regular personal request to employee specialist", () => {
-  const decision = routeConversation({
+function mockModel(specialist: "employee" | "manager") {
+  return new MockLanguageModelV3({
+    doGenerate: {
+      content: [{ type: "text", text: JSON.stringify({ specialist }) }],
+      finishReason: { unified: "stop" as const, raw: "stop" },
+      usage: {
+        inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
+        outputTokens: { total: 5, text: 5, reasoning: undefined },
+      },
+      warnings: [],
+    },
+  });
+}
+
+test("routes personal request to employee specialist", async () => {
+  const decision = await routeConversation({
+    model: mockModel("employee"),
     session: createSession("user"),
     messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "check my balance" }] }],
   });
@@ -59,8 +70,9 @@ test("routes regular personal request to employee specialist", () => {
   assert.deepEqual(decision, { type: "delegate", specialist: "employee" });
 });
 
-test("denies manager intent in user mode", () => {
-  const decision = routeConversation({
+test("denies manager intent in user mode", async () => {
+  const decision = await routeConversation({
+    model: mockModel("manager"),
     session: createSession("user"),
     messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "approve Mia request" }] }],
   });
@@ -68,11 +80,22 @@ test("denies manager intent in user mode", () => {
   assert.equal(decision.type, "deny");
 });
 
-test("routes manager intent to manager specialist in manager mode", () => {
-  const decision = routeConversation({
+test("routes manager intent to manager specialist in manager mode", async () => {
+  const decision = await routeConversation({
+    model: mockModel("manager"),
     session: createSession("manager"),
     messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "approve Mia request" }] }],
   });
 
   assert.deepEqual(decision, { type: "delegate", specialist: "manager" });
+});
+
+test("routes employee intent to employee specialist in manager mode", async () => {
+  const decision = await routeConversation({
+    model: mockModel("employee"),
+    session: createSession("manager"),
+    messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "check my balance" }] }],
+  });
+
+  assert.deepEqual(decision, { type: "delegate", specialist: "employee" });
 });

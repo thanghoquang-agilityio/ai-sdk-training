@@ -84,7 +84,8 @@ export async function POST(req: Request) {
     return Response.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 
-  const coordinatorDecision = routeConversation({
+  const coordinatorDecision = await routeConversation({
+    model: modelConfig.model,
     messages: body.messages,
     session,
   });

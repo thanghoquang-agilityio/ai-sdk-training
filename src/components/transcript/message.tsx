@@ -20,6 +20,7 @@ import {
   getToolStatusCopy,
   getMutationSuccessCard,
   getAssistantInitials,
+  readMessageMeta,
   TOOL_STATUS_TONE_CLASS,
   type MutationSuccessCard,
 } from "./tool";
@@ -218,7 +219,8 @@ export function ChatMessage({
     .reverse()
     .map((part) => getToolStepText(part))
     .find((step): step is string => Boolean(step));
-  const thinkingLabel = currentToolStep ?? "Thinking";
+  const agentLabel = readMessageMeta(message)?.agentLabel ?? null;
+  const thinkingLabel = currentToolStep ?? (agentLabel ? `Assign: ${agentLabel}` : "Thinking");
   const shouldDeferOutputTables = !isUser && isLastMessage && isLoading;
   const visibleOutputTables = shouldDeferOutputTables
     ? []

@@ -39,7 +39,7 @@ function toClientErrorMessage(error: unknown): string {
     msg.toLowerCase().includes(p.toLowerCase()),
   );
   return isConnectionError
-    ? "Could not reach the AI provider. Make sure Ollama is running or your provider is configured correctly."
+    ? "Could not reach the AI provider. Check your API key and provider configuration, or try again later."
     : "";
 }
 

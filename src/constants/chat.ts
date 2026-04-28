@@ -52,6 +52,18 @@ export const QUICK_ACTIONS_BY_ROLE: Record<AppRole, QuickAction[]> = {
   ],
   manager: [
     {
+      label: "Check balance",
+      prompt: "How many annual, sick, and personal leave days do I have left?",
+    },
+    {
+      label: "Review pending",
+      prompt: "List my pending time-off requests first.",
+    },
+    {
+      label: "All requests",
+      prompt: "Show all my time-off requests.",
+    },
+    {
       label: "Team pending",
       prompt: "Show my team's pending time-off requests.",
     },

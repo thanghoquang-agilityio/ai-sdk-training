@@ -1,70 +1,63 @@
-import type { UIMessage } from "ai";
+import { generateObject } from "ai";
+import type { LanguageModel, UIMessage } from "ai";
+import { z } from "zod";
 import type { MockAuthSession } from "@/lib/auth/session";
 import type { CoordinatorDecision } from "../types";
 import { getTextParts } from "@/utils/message";
 
-const MANAGER_INTENT_PATTERNS = [
-  /\bapprove\b/i,
-  /\breject\b/i,
-  /\bteam\b/i,
-  /\bdirect\s+report/i,
-  /\bcoverage\b/i,
-  /\bapproval/i,
-  /\bemployee[s]?\b/i,
-  /\bmembers?\b/i,
-  /\bproject\b/i,
-];
+const routeSchema = z.object({
+  specialist: z.enum(["employee", "manager"]),
+});
 
 type RouteConversationInput = {
+  model: LanguageModel;
   messages: UIMessage[];
   session: MockAuthSession;
 };
 
-/**
- * Gets latest user text.
- * @param {UIMessage[]} messages
- * @returns {string}
- */
 function getLatestUserText(messages: UIMessage[]): string {
-  const latestUserMessage = [...messages]
-    .reverse()
-    .find((m) => m.role === "user");
-
-  if (!latestUserMessage) return "";
-  return getTextParts(latestUserMessage).join(" ").trim();
+  const latest = [...messages].reverse().find((m) => m.role === "user");
+  if (!latest) return "";
+  return getTextParts(latest).join(" ").trim();
 }
 
-/**
- * Checks whether managed employee reference exists.
- * @param {MockAuthSession} session
- * @param {string} text
- */
-function hasManagedEmployeeReference(session: MockAuthSession, text: string) {
-  const normalized = text.toLowerCase();
+function buildRoutingSystemPrompt(session: MockAuthSession): string {
+  const lines = [
+    "You are a routing coordinator. Classify which specialist agent should handle the user's message.",
+    "",
+    "## Route hints",
+    "- employee: personal time-off — own leave balance, own request history, submit own request, cancel own request",
+    "- manager: team operations — approve or reject team requests, list team members, review team pending queue",
+    "",
+    'Default to "employee" for ambiguous or unclear messages.',
+  ];
 
-  return session.managedEmployees.some((employee) =>
-    [employee.name, employee.email, employee.employeeId]
-      .map((v) => v.toLowerCase())
-      .some((token) => normalized.includes(token)),
-  );
-}
-
-/**
- * routeConversation helper.
- * @param {RouteConversationInput} input
- * @returns {CoordinatorDecision}
- */
-export function routeConversation(input: RouteConversationInput): CoordinatorDecision {
-  const latestUserText = getLatestUserText(input.messages);
-  const isManagerIntent =
-    MANAGER_INTENT_PATTERNS.some((p) => p.test(latestUserText)) ||
-    hasManagedEmployeeReference(input.session, latestUserText);
-
-  if (!isManagerIntent) {
-    return { type: "delegate", specialist: "employee" };
+  if (session.managedEmployees.length > 0) {
+    const names = session.managedEmployees.map((e) => e.name).join(", ");
+    lines.push(
+      "",
+      "## Direct reports",
+      names,
+      'Route to "manager" if the message mentions any of these names.',
+    );
   }
 
-  if (input.session.role !== "manager") {
+  return lines.join("\n");
+}
+
+export async function routeConversation(
+  input: RouteConversationInput,
+): Promise<CoordinatorDecision> {
+  const userText = getLatestUserText(input.messages);
+
+  const { object } = await generateObject({
+    model: input.model,
+    schema: routeSchema,
+    system: buildRoutingSystemPrompt(input.session),
+    prompt: userText || "(no message)",
+  });
+
+  if (object.specialist === "manager" && input.session.role !== "manager") {
     return {
       type: "deny",
       message:
@@ -72,5 +65,5 @@ export function routeConversation(input: RouteConversationInput): CoordinatorDec
     };
   }
 
-  return { type: "delegate", specialist: "manager" };
+  return { type: "delegate", specialist: object.specialist };
 }
