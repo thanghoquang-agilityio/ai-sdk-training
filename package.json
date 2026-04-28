@@ -6,25 +6,21 @@
   "scripts": {
     "dev": "pnpm run dev:all",
     "dev:web": "next dev",
-    "dev:ollama": "sh -c \"curl -sSf http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && echo 'Ollama already running on 127.0.0.1:11434' || ollama serve\"",
-    "dev:mcp": "node scripts/mcp-demo-server.mjs",
-    "dev:all": "sh -c \"pnpm run dev:web & pnpm run dev:ollama & pnpm run dev:mcp & wait\"",
+    "dev:company-system": "node server/scripts/company-system-server.mjs",
+    "dev:ollama": "sh -c \"curl -sSf http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && echo 'Ollama already running on 127.0.0.1:11434' || (command -v ollama >/dev/null 2>&1 && ollama serve || { echo 'Ollama not installed; skipping local Ollama startup.'; exit 0; })\"",
+    "dev:all": "sh -c \"pnpm run dev:web & WEB_PID=$!; pnpm run dev:company-system & DB_PID=$!; pnpm run dev:ollama & OLLAMA_PID=$!; trap 'kill $WEB_PID $DB_PID $OLLAMA_PID 2>/dev/null' INT TERM EXIT; wait $WEB_PID; STATUS=$?; kill $DB_PID $OLLAMA_PID 2>/dev/null || true; wait $DB_PID 2>/dev/null || true; wait $OLLAMA_PID 2>/dev/null || true; exit $STATUS\"",
     "dev:mock-production": "NEXT_PUBLIC_MOCK_PRODUCTION=true pnpm run dev:all",
+    "company-system:reset": "node server/scripts/reset-company-system.mjs",
     "ollama:pull": "ollama pull qwen2.5:3b",
     "ollama:pull:vision": "ollama pull gemma3:4b",
     "tunnel:ollama": "cloudflared tunnel --url http://127.0.0.1:11434 --http-host-header 127.0.0.1:11434",
-    "tunnel:mcp": "cloudflared tunnel --url http://127.0.0.1:4001 --http-host-header 127.0.0.1:4001",
-    "mcp:demo": "node scripts/mcp-demo-server.mjs",
-    "mcp:demo:stdio": "node scripts/mcp-demo-server-stdio.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
-    "@ai-sdk/mcp": "^1.0.25",
     "@ai-sdk/openai": "^3.0.27",
     "@ai-sdk/react": "^3.0.83",
-    "@modelcontextprotocol/sdk": "^1.27.1",
     "ai": "^6.0.81",
     "mammoth": "^1.11.0",
     "next": "16.1.6",
@@ -40,6 +36,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "json-server": "^1.0.0-beta.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

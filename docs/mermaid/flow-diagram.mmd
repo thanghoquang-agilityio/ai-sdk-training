@@ -1,0 +1,58 @@
+flowchart RL
+ subgraph USER_PHASE["Interaction"]
+    direction LR
+        U["👤<br><b>User</b>"]
+        API["☁️<br><b>Next.js API</b><br>/api/chat"]
+  end
+ subgraph ORCH_PHASE["Orchestration"]
+    direction TB
+        COORD["🎯<br><b>Coordinator</b><br>chat-core/coordinator"]
+        AUTH["🔐<br><b>Auth Guard</b><br>Role verification"]
+  end
+ subgraph AGENT_PHASE["Specialists"]
+    direction LR
+        MGR_AGENT["👔<br><b>Manager Agent</b><br>runManagerAgent"]
+        EMP_AGENT["👷<br><b>Employee Agent</b><br>runEmployeeAgent"]
+  end
+ subgraph TOOL_PHASE["Execution"]
+    direction LR
+        T_SLACK["📖 Read / ✏️ Write<br>Slack Service"]
+        T_COMP["📖 Read / ✏️ Write<br>Company System"]
+  end
+    U -- Send Message --> API
+    API -- Authenticate --> AUTH
+    AUTH -- Route by Role/Intent --> COORD
+    COORD -- Assign Specialist --> AGENT_PHASE
+    AGENT_PHASE -- Tool Call --> TOOL_PHASE
+    TOOL_PHASE -- Respond --> AGENT_PHASE
+    AGENT_PHASE -- Stream Response --> API
+    API -- SSE / JSON --> U
+    AUTH ~~~ U
+
+    U@{ shape: rect}
+    API@{ shape: rect}
+    COORD@{ shape: rect}
+    AUTH@{ shape: rect}
+    MGR_AGENT@{ shape: rect}
+    EMP_AGENT@{ shape: rect}
+    T_SLACK@{ shape: rect}
+    T_COMP@{ shape: rect}
+     U:::actor
+     API:::orchestrator
+     COORD:::coord
+     AUTH:::idp
+     MGR_AGENT:::agent
+     EMP_AGENT:::agent
+     T_SLACK:::tool
+     T_COMP:::tool
+    classDef actor fill:#FFF4E5,stroke:#F59E0B,color:#5B3A00,stroke-width:1.7px
+    classDef orchestrator fill:#FEF3C7,stroke:#D97706,color:#3B2F12,stroke-width:1.8px
+    classDef coord fill:#9cc9eb,stroke:#427aa1,color:#102a43,stroke-width:1.5px
+    classDef idp fill:#b7efc5,stroke:#3a7d44,color:#16351f,stroke-width:1.5px
+    classDef agent fill:#f28c8c,stroke:#b85757,color:#3d1111,stroke-width:1.8px
+    classDef tool fill:#F8FAFC,stroke:#94A3B8,color:#0F172A,stroke-width:1.3px
+    style AGENT_PHASE fill:#FFF1F2,stroke:#FECDD3,stroke-width:1.2px
+    style TOOL_PHASE fill:#F0FDF4,stroke:#BBF7D0,stroke-width:1.2px
+    style USER_PHASE fill:#F8FAFC,stroke:#CBD5E1,stroke-width:1.3px,stroke-dasharray:4
+    style ORCH_PHASE fill:#FFF7ED,stroke:#FDBA74,stroke-width:1.5px,stroke-dasharray:5
+    

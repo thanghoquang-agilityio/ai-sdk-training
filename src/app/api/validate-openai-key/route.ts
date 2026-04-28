@@ -1,48 +1,49 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
-import { getErrorMessage } from "@/utils/error-message";
-
-type ValidateKeyRequestBody = {
-  apiKey?: string;
-};
+import {
+  API_COMMON_ERROR_COPY,
+  OPENAI_VALIDATION_API_COPY,
+} from "@/constants/api";
+import type { OpenAIKeyValidationRequestBody } from "@/types/api";
+import { getErrorMessage } from "@/utils/error";
 
 function badRequest(message: string) {
   return Response.json({ ok: false, message }, { status: 400 });
 }
 
 export async function POST(req: Request) {
-  let body: ValidateKeyRequestBody;
+  let body: OpenAIKeyValidationRequestBody;
   try {
-    body = (await req.json()) as ValidateKeyRequestBody;
+    body = (await req.json()) as OpenAIKeyValidationRequestBody;
   } catch {
-    return badRequest("Invalid JSON body.");
+    return badRequest(API_COMMON_ERROR_COPY.invalidJsonBody);
   }
 
   const apiKey = body.apiKey?.trim();
   if (!apiKey) {
-    return badRequest("`apiKey` is required.");
+    return badRequest(OPENAI_VALIDATION_API_COPY.missingApiKey);
   }
 
   try {
     const openai = createOpenAI({
       apiKey,
-      baseURL: "https://api.openai.com/v1",
+      baseURL: OPENAI_VALIDATION_API_COPY.baseUrl,
     });
 
     await generateText({
-      model: openai.chat("gpt-4o-mini"),
-      prompt: "hello",
+      model: openai.chat(process.env.OPENAI_MODEL ?? OPENAI_VALIDATION_API_COPY.testModel),
+      prompt: OPENAI_VALIDATION_API_COPY.testPrompt,
     });
 
     return Response.json({
       ok: true,
-      message: "OpenAI key is valid.",
+      message: OPENAI_VALIDATION_API_COPY.valid,
     });
   } catch (error) {
     return Response.json(
       {
         ok: false,
-        message: "OpenAI key can't use.",
+        message: OPENAI_VALIDATION_API_COPY.invalid,
         details: getErrorMessage(error),
       },
       { status: 400 },

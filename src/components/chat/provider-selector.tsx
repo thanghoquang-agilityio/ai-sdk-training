@@ -1,129 +1,128 @@
 import type { AIProviderName } from "@/lib/ai-provider";
-import { isProductionLikeClient } from "@/lib/runtime-env";
+import { isProductionLike } from "@/lib/runtime-env";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
+import {
+  DEFAULT_PROVIDER_OPTIONS,
+  PROVIDER_OPTION_LABEL,
+  PROVIDER_PANEL_COPY,
+} from "@/constants/provider";
+import type { UseProviderSelectionResult } from "@/types/provider";
 
 type ProviderSelectorProps = {
-  selectedProvider: AIProviderName;
+  provider: UseProviderSelectionResult;
   allowedProviders?: AIProviderName[];
-  openaiApiKeyInput: string;
-  ollamaBaseUrlInput: string;
-  isOpenAISelected: boolean;
-  isValidatingKey: boolean;
-  isValidatingOllamaBaseUrl: boolean;
-  providerStatus: string;
   withContainer?: boolean;
-  onProviderChange: (provider: AIProviderName) => void;
-  onOpenAIApiKeyChange: (value: string) => void;
-  onOllamaBaseUrlChange: (value: string) => void;
-  onVerifyOpenAIKey: () => void | Promise<void>;
-  onVerifyOllamaBaseUrl: () => void | Promise<void>;
 };
 
 export function ProviderSelector({
-  selectedProvider,
-  allowedProviders = ["ollama", "openai"],
-  openaiApiKeyInput,
-  ollamaBaseUrlInput,
-  isOpenAISelected,
-  isValidatingKey,
-  isValidatingOllamaBaseUrl,
-  providerStatus,
+  provider,
+  allowedProviders = DEFAULT_PROVIDER_OPTIONS,
   withContainer = true,
-  onProviderChange,
-  onOpenAIApiKeyChange,
-  onOllamaBaseUrlChange,
-  onVerifyOpenAIKey,
-  onVerifyOllamaBaseUrl,
 }: ProviderSelectorProps) {
   const isProviderSelectDisabled = allowedProviders.length <= 1;
-  const showOllamaBaseUrlInput = isProductionLikeClient() && !isOpenAISelected;
 
   const content = (
-    <div className="flex flex-col gap-2">
-      <Text as="label" variant="body" className="font-medium text-slate-800">
-        AI Provider
-      </Text>
+    <div className="flex flex-col gap-3">
+      <div className="space-y-1">
+        <Text as="label" variant="sectionTitle">
+          {PROVIDER_PANEL_COPY.label}
+        </Text>
+        <Text variant="captionStrong">
+          {PROVIDER_PANEL_COPY.description}
+        </Text>
+      </div>
 
       <Select
-        value={selectedProvider}
+        value={provider.selectedProvider}
         onChange={(event) =>
-          onProviderChange(event.target.value as AIProviderName)
+          provider.selectProvider(event.target.value as AIProviderName)
         }
         disabled={isProviderSelectDisabled}
         fullWidth
         controlSize="md"
-        variant="default"
+        variant="dark"
       >
         {allowedProviders.includes("ollama") ? (
-          <option value="ollama">Ollama</option>
+          <option value="ollama">{PROVIDER_OPTION_LABEL.ollama}</option>
         ) : null}
         {allowedProviders.includes("openai") ? (
-          <option value="openai">OpenAI</option>
+          <option value="openai">{PROVIDER_OPTION_LABEL.openai}</option>
         ) : null}
       </Select>
 
-      <Text variant="caption" className="min-h-4" aria-live="polite">
-        {providerStatus}
+      <Text variant="captionStrong" className="min-h-4" aria-live="polite">
+        {provider.providerStatus}
       </Text>
 
-      {isOpenAISelected ? (
+      {provider.isOpenAISelected ? (
         <div className="flex flex-col gap-2">
           <Input
             type="password"
-            value={openaiApiKeyInput}
-            onChange={(event) => onOpenAIApiKeyChange(event.target.value)}
-            placeholder="Enter OpenAI API key (sk-...)"
+            value={provider.openaiApiKeyInput}
+            onChange={(event) => provider.updateOpenAIApiKeyInput(event.target.value)}
+            placeholder={PROVIDER_PANEL_COPY.openaiApiKeyPlaceholder}
             fullWidth
             controlSize="md"
-            variant="default"
+            variant="dark"
           />
           <Button
             type="button"
-            onClick={onVerifyOpenAIKey}
-            isLoading={isValidatingKey}
+            onClick={provider.verifyOpenAIKey}
+            isLoading={provider.isValidatingKey}
+            disabled={provider.isOpenAIKeyVerified}
             variant="primary"
             size="md"
             fullWidth
           >
-            {isValidatingKey ? "Verifying..." : "Verify key"}
+            {provider.isValidatingKey
+              ? PROVIDER_PANEL_COPY.verifyActionLoadingLabel
+              : PROVIDER_PANEL_COPY.verifyOpenAIButtonLabel}
           </Button>
         </div>
-      ) : null}
-
-      {showOllamaBaseUrlInput ? (
+      ) : (
         <div className="flex flex-col gap-2">
           <Input
             type="url"
-            value={ollamaBaseUrlInput}
-            onChange={(event) => onOllamaBaseUrlChange(event.target.value)}
-            placeholder="Ollama base URL (e.g. https://your-tunnel.example.com) — /v1 auto-added"
+            value={provider.ollamaBaseUrlInput}
+            onChange={(event) => provider.updateOllamaBaseUrlInput(event.target.value)}
+            placeholder={PROVIDER_PANEL_COPY.ollamaBaseUrlPlaceholder}
             fullWidth
             controlSize="md"
-            variant="default"
+            variant="dark"
           />
-
           <Button
             type="button"
-            onClick={onVerifyOllamaBaseUrl}
-            isLoading={isValidatingOllamaBaseUrl}
-            variant="primary"
+            onClick={provider.verifyOllamaBaseUrl}
+            isLoading={provider.isValidatingOllamaBaseUrl}
+            disabled={provider.isOllamaUrlVerified}
+            variant="ghost"
             size="md"
+            fullWidth
+            className="font-dm-sans border border-white/12 text-white/60 hover:bg-white/8"
           >
-            {isValidatingOllamaBaseUrl ? "Verifying..." : "Verify URL"}
+            {provider.isValidatingOllamaBaseUrl
+              ? PROVIDER_PANEL_COPY.verifyActionLoadingLabel
+              : PROVIDER_PANEL_COPY.verifyOllamaButtonLabel}
           </Button>
+          <Text variant="captionMuted">
+            {isProductionLike()
+              ? PROVIDER_PANEL_COPY.productionOllamaHint
+              : PROVIDER_PANEL_COPY.localOllamaHint}
+          </Text>
         </div>
-      ) : null}
+      )}
     </div>
   );
 
   if (!withContainer) return content;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card variant="panel" className="p-4">
       {content}
-    </section>
+    </Card>
   );
 }

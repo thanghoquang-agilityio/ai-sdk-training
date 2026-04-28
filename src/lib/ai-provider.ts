@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
-import { isProductionLikeServer } from "@/lib/runtime-env";
+import { isProductionLike } from "@/lib/runtime-env";
+import { normalizeOllamaBaseUrl } from "@/lib/ollama-url";
 
 export const SUPPORTED_AI_PROVIDERS = ["openai", "ollama"] as const;
 
@@ -27,141 +28,124 @@ export function getSupportedAIProviderList(): string {
   return SUPPORTED_AI_PROVIDERS.join(", ");
 }
 
-abstract class ProviderResolver {
-  constructor(
-    readonly provider: AIProviderName,
-    protected readonly overrides: ChatModelOverrides,
-  ) {}
-
-  protected abstract resolveModelFromEnv(): string | undefined;
-
-  protected abstract getDefaultModelId(): string;
-  protected abstract createModel(modelId: string): LanguageModel;
-
-  getConfig(): ChatModelConfig {
-    const modelId = this.resolveModelFromEnv() ?? this.getDefaultModelId();
-
-    return {
-      provider: this.provider,
-      modelId,
-      model: this.createModel(modelId),
-    };
-  }
+function resolveOpenAIKey(overrides: ChatModelOverrides): string {
+  const key = overrides.openaiApiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
+  if (!key) throw new Error("OpenAI API key is required.");
+  return key;
 }
 
-class OpenAIResolver extends ProviderResolver {
-  constructor(overrides: ChatModelOverrides) {
-    super("openai", overrides);
-  }
-
-  protected resolveModelFromEnv(): string | undefined {
-    const configuredProvider = process.env.AI_PROVIDER?.trim().toLowerCase();
-
-    return (
-      this.overrides.modelId ??
-      process.env.OPENAI_MODEL ??
-      (configuredProvider === "openai" ? process.env.AI_MODEL : undefined)
-    );
-  }
-
-  protected getDefaultModelId(): string {
-    return "gpt-4o-mini";
-  }
-
-  protected createModel(modelId: string): LanguageModel {
-    const apiKey = this.resolveOpenAIApiKey();
-    const openai = createOpenAI({
-      baseURL: this.overrides.baseUrl ?? process.env.OPENAI_BASE_URL,
-      apiKey,
-    });
-
-    return openai.chat(modelId);
-  }
-
-  private resolveOpenAIApiKey(): string {
-    const keyFromOverride = this.overrides.openaiApiKey?.trim();
-    if (keyFromOverride) return keyFromOverride;
-
-    const keyFromEnv = process.env.OPENAI_API_KEY?.trim();
-    if (keyFromEnv) return keyFromEnv;
-
-    throw new Error("OpenAI API key is required.");
-  }
+function openAIModelId(overrides: ChatModelOverrides): string {
+  const configuredProvider = process.env.AI_PROVIDER?.trim().toLowerCase();
+  return (
+    overrides.modelId ??
+    process.env.OPENAI_MODEL ??
+    (configuredProvider === "openai" ? process.env.AI_MODEL : undefined) ??
+    "gpt-4o-mini"
+  );
 }
 
-class OllamaResolver extends ProviderResolver {
-  constructor(overrides: ChatModelOverrides) {
-    super("ollama", overrides);
-  }
+function openAIConfig(overrides: ChatModelOverrides): ChatModelConfig {
+  const modelId = openAIModelId(overrides);
+  const apiKey = resolveOpenAIKey(overrides);
+  const openai = createOpenAI({
+    baseURL: overrides.baseUrl ?? process.env.OPENAI_BASE_URL,
+    apiKey,
+  });
+  return { provider: "openai", modelId, model: openai.chat(modelId) };
+}
 
-  protected resolveModelFromEnv(): string | undefined {
-    const configuredProvider = process.env.AI_PROVIDER?.trim().toLowerCase();
+function ollamaModelId(overrides: ChatModelOverrides): string {
+  const configuredProvider = process.env.AI_PROVIDER?.trim().toLowerCase();
+  return (
+    overrides.modelId ??
+    process.env.OLLAMA_MODEL ??
+    (configuredProvider === "ollama" ? process.env.AI_MODEL : undefined) ??
+    "qwen2.5:3b"
+  );
+}
 
-    return (
-      this.overrides.modelId ??
-      process.env.OLLAMA_MODEL ??
-      (configuredProvider === "ollama" ? process.env.AI_MODEL : undefined)
-    );
-  }
+const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434/v1";
 
-  protected getDefaultModelId(): string {
-    return "qwen2.5:3b";
-  }
+function resolveOllamaBaseUrl(overrides: ChatModelOverrides): string {
+  const raw = overrides.baseUrl ?? process.env.OLLAMA_BASE_URL;
+  // normalizeOllamaBaseUrl appends /v1 if missing — guards against bare host:port in env.
+  return (raw ? normalizeOllamaBaseUrl(raw) : null) ?? OLLAMA_DEFAULT_BASE_URL;
+}
 
-  protected createModel(modelId: string): LanguageModel {
-    const openaiCompatible = createOpenAI({
-      baseURL:
-        this.overrides.baseUrl ??
-        process.env.OPENAI_BASE_URL ??
-        "http://localhost:11434/v1",
-      apiKey: process.env.OPENAI_API_KEY ?? "ollama",
-    });
-
-    // Ollama OpenAI-compatible endpoint works best with chat mode.
-    return openaiCompatible.chat(modelId);
-  }
+function ollamaConfig(overrides: ChatModelOverrides): ChatModelConfig {
+  const modelId = ollamaModelId(overrides);
+  const openaiCompatible = createOpenAI({
+    baseURL: resolveOllamaBaseUrl(overrides),
+    apiKey: "ollama",
+  });
+  // Ollama OpenAI-compatible endpoint works best with chat mode.
+  return { provider: "ollama", modelId, model: openaiCompatible.chat(modelId) };
 }
 
 function resolveDefaultProvider(): AIProviderName {
-  return isProductionLikeServer() ? "openai" : "ollama";
+  return isProductionLike() ? "openai" : "ollama";
 }
 
 function resolveProvider(overrides: ChatModelOverrides): AIProviderName {
-  if (overrides.provider) {
-    return overrides.provider;
-  }
+  if (overrides.provider) return overrides.provider;
 
   const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
 
-  if (!provider) {
-    return resolveDefaultProvider();
-  }
+  if (!provider) return resolveDefaultProvider();
 
-  if (isAIProviderName(provider)) {
-    return provider;
-  }
+  if (isAIProviderName(provider)) return provider;
 
   throw new Error(
     `Unsupported AI_PROVIDER "${provider}". Supported values: ${getSupportedAIProviderList()}.`,
   );
 }
 
-function getResolver(
+function getProviderResolutionOrder(overrides: ChatModelOverrides): AIProviderName[] {
+  if (overrides.provider) return [overrides.provider];
+
+  const primaryProvider = resolveProvider(overrides);
+  const fallbackProviders = SUPPORTED_AI_PROVIDERS.filter(
+    (provider) => provider !== primaryProvider,
+  );
+
+  return [primaryProvider, ...fallbackProviders];
+}
+
+function buildConfig(
   provider: AIProviderName,
   overrides: ChatModelOverrides,
-): ProviderResolver {
+): ChatModelConfig {
+  const merged = { ...overrides, provider };
   switch (provider) {
     case "openai":
-      return new OpenAIResolver(overrides);
+      return openAIConfig(merged);
     case "ollama":
-      return new OllamaResolver(overrides);
+      return ollamaConfig(merged);
   }
 }
 
-export function getChatModelConfig(
+export function getChatModelCandidates(
   overrides: ChatModelOverrides = {},
-): ChatModelConfig {
-  const provider = resolveProvider(overrides);
-  const resolver = getResolver(provider, overrides);
-  return resolver.getConfig();
+): ChatModelConfig[] {
+  const providerOrder = getProviderResolutionOrder(overrides);
+  const candidates: ChatModelConfig[] = [];
+  let lastError: unknown = null;
+
+  for (const provider of providerOrder) {
+    try {
+      candidates.push(buildConfig(provider, overrides));
+    } catch (error) {
+      lastError = error;
+
+      if (overrides.provider) {
+        throw error;
+      }
+    }
+  }
+
+  if (candidates.length > 0) return candidates;
+
+  if (lastError instanceof Error) throw lastError;
+
+  throw new Error("No available AI provider configuration was resolved.");
 }

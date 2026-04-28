@@ -1,0 +1,41 @@
+flowchart TB
+ subgraph AGENTS["Specialist Agents"]
+    direction LR
+        MGR("👔<br><b>Manager Agent</b>")
+        EMP("👷<br><b>Employee Agent</b>")
+  end
+ subgraph APP["System"]
+    direction TB
+        UI@{ label: "🌐<br><b>Next.js App</b><br><span style=\"font-size:12px\">Frontend + API Routes</span>" }
+        COORD["🎯 Coordinator"]
+        IDP["🔐 Mock Auth"]
+        AGENTS
+  end
+ subgraph INTS["Integrations"]
+    direction LR
+        SLACK["💬<br><b>Slack API</b>"]
+        COMP@{ label: "🏢<br><b>Company System</b><br><span style=\"font-size:12px\">Flash API Mock</span>" }
+  end
+    U["👤<br><b>User</b>"] <--> UI
+    UI <--> IDP & COORD
+    COORD --> AGENTS
+    AGENTS <--> LLM["🤖 AI Providers"]
+    AGENTS --> INTS
+    COMP <--> DB["🗃️ JSON DB"]
+    SLACK <--> SlackWebhook["🚀 Slack Webhook"]
+
+    UI@{ shape: rounded}
+    COMP@{ shape: rect}
+    style UI fill:#f3e38b,stroke:#8a6d1f,stroke-width:1.5px
+    style COORD fill:#9cc9eb,stroke:#427aa1,stroke-width:1.5px
+    style IDP fill:#b7efc5,stroke:#3a7d44,stroke-width:1.5px
+    style MGR fill:#f28c8c,stroke:#b85757,stroke-width:1.8px
+    style EMP fill:#f28c8c,stroke:#b85757,stroke-width:1.8px
+    style SLACK fill:#d78af0,stroke:#9b59b6,stroke-width:1.5px
+    style COMP fill:#b7efc5,stroke:#4c956c,stroke-width:1.5px
+    style DB fill:#c8f2e4,stroke:#2a9d8f,stroke-width:1.5px
+    style LLM fill:#d1d5db,stroke:#6b7280,stroke-width:1.5px
+    style AGENTS fill:#fff1f2,stroke:#fecdd3,stroke-width:1.2px
+    style INTS fill:#fff7ed,stroke:#fdba74,stroke-width:1.5px,stroke-dasharray:4
+    style APP fill:#f8fafc,stroke:#cbd5e1,stroke-width:1.5px,stroke-dasharray:4
+    

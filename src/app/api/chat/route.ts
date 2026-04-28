@@ -1,51 +1,28 @@
 import {
-  convertToModelMessages,
-  stepCountIs,
-  streamText,
-  type UIMessage,
-} from "ai";
+  createStaticAgentResponse,
+  logAgent,
+  routeConversation,
+} from "@/agents/chat-core";
+import { runManagerAgent } from "@/agents/manager/run";
+import { runEmployeeAgent } from "@/agents/employee/run";
+import { API_COMMON_ERROR_COPY, CHAT_API_COPY } from "@/constants/api";
+import { isAppRole } from "@/lib/auth/session";
+import { getMockAuthSession } from "@/lib/auth/session-store";
 import {
-  DEFAULT_CHAT_FEATURE_MODE,
-  isChatFeatureMode,
-  type ChatFeatureMode,
-} from "@/constants/ai-feature";
-import {
-  AIProviderName,
-  getChatModelConfig,
+  type ChatModelConfig,
+  getChatModelCandidates,
   getSupportedAIProviderList,
   isAIProviderName,
+  type AIProviderName,
 } from "@/lib/ai-provider";
-import {
-  hasImageFileAttachment,
-  normalizeMessagesForFileAttachments,
-} from "@/lib/chat-attachment";
-import {
-  FEATURE_SYSTEM_PROMPTS,
-  getToolsForMode,
-} from "@/lib/chat/feature-config";
-import { normalizeMcpServerUrl } from "@/lib/mcp-url";
-import { resolveOllamaVisionModel } from "@/lib/chat/ollama-vision";
 import { normalizeOllamaBaseUrl } from "@/lib/ollama-url";
-import {
-  formatStreamError,
-  resolveProviderCandidate,
-  streamWithMcpTools,
-  streamWithMultiAgentPipeline,
-} from "@/lib/chat/pipelines";
-import { isProductionLikeServer } from "@/lib/runtime-env";
-import { getErrorMessage } from "@/utils/error-message";
+import type { ChatApiRequestBody } from "@/types/api";
+import { getErrorMessage } from "@/utils/error";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
 
-type ChatRequestBody = {
-  messages?: UIMessage[];
-  provider?: string;
-  openaiApiKey?: string;
-  ollamaBaseUrl?: string;
-  mcpServerUrl?: string;
-  featureMode?: string;
-};
+const handleAgentLogger = logAgent;
 
 function badRequest(message: string) {
   return Response.json({ error: message }, { status: 400 });
@@ -63,174 +40,84 @@ function parseProviderOverride(provider?: string): {
 
   if (!isAIProviderName(providerFromBody)) {
     return {
-      errorMessage: `Invalid \`provider\`. Supported values: ${getSupportedAIProviderList()}.`,
+      errorMessage: `${CHAT_API_COPY.invalidProviderPrefix} ${getSupportedAIProviderList()}.`,
     };
   }
 
   return { providerOverride: providerFromBody };
 }
 
-function parseFeatureMode(featureMode?: string): {
-  featureMode?: ChatFeatureMode;
-  errorMessage?: string;
-} {
-  const featureModeRaw =
-    featureMode?.trim().toLowerCase() ?? DEFAULT_CHAT_FEATURE_MODE;
-  // Backward compatibility for older payloads.
-  const normalizedFeatureMode =
-    featureModeRaw === "multi-tool" ? "agent" : featureModeRaw;
-
-  if (!isChatFeatureMode(normalizedFeatureMode)) {
-    return { errorMessage: `Invalid \`featureMode\`: ${featureModeRaw}.` };
-  }
-
-  return { featureMode: normalizedFeatureMode };
-}
-
-function deriveOllamaTagsEndpoint(baseUrl?: string): string | undefined {
-  if (!baseUrl?.trim()) return undefined;
-
-  try {
-    return new URL("/api/tags", baseUrl).toString();
-  } catch {
-    return undefined;
-  }
-}
-
-function validateRuntimeConstraints({
-  provider,
-  featureMode,
-  ollamaBaseUrl,
-  mcpServerUrl,
-}: {
-  provider: AIProviderName;
-  featureMode: ChatFeatureMode;
-  ollamaBaseUrl?: string;
-  mcpServerUrl?: string;
-}): string | undefined {
-  if (provider === "openai" && featureMode === "mcp") {
-    return "`mcp` mode is disabled for OpenAI provider. Switch to Ollama provider.";
-  }
-
-  if (!isProductionLikeServer() || provider !== "ollama") {
-    return undefined;
-  }
-
-  if (!ollamaBaseUrl?.trim()) {
-    return "Production Ollama requires `ollamaBaseUrl` (public tunnel URL).";
-  }
-
-  if (featureMode === "mcp" && !mcpServerUrl?.trim()) {
-    return "MCP mode with Ollama requires `mcpServerUrl` (public MCP URL).";
-  }
-
-  return undefined;
-}
-
 export async function POST(req: Request) {
-  let body: ChatRequestBody;
+  let body: ChatApiRequestBody;
+
   try {
-    body = (await req.json()) as ChatRequestBody;
+    body = (await req.json()) as ChatApiRequestBody;
   } catch {
-    return badRequest("Invalid JSON body.");
+    return badRequest(API_COMMON_ERROR_COPY.invalidJsonBody);
   }
 
   if (!Array.isArray(body.messages)) {
-    return badRequest("`messages` must be an array.");
+    return badRequest(CHAT_API_COPY.invalidMessages);
   }
 
-  const { providerOverride, errorMessage: providerErrorMessage } =
-    parseProviderOverride(body.provider);
-  if (providerErrorMessage) {
-    return badRequest(providerErrorMessage);
+  const { providerOverride, errorMessage } = parseProviderOverride(body.provider);
+  if (errorMessage) {
+    return badRequest(errorMessage);
   }
 
-  const { featureMode, errorMessage: featureModeErrorMessage } =
-    parseFeatureMode(body.featureMode);
-  if (featureModeErrorMessage || !featureMode) {
-    return badRequest(featureModeErrorMessage ?? "Invalid `featureMode`.");
-  }
-
-  const providerCandidate = resolveProviderCandidate(providerOverride);
-  const runtimeConstraintError = validateRuntimeConstraints({
-    provider: providerCandidate,
-    featureMode,
-    ollamaBaseUrl: body.ollamaBaseUrl,
-    mcpServerUrl: body.mcpServerUrl,
-  });
-  if (runtimeConstraintError) {
-    return badRequest(runtimeConstraintError);
-  }
-
-  const hasImageAttachment = hasImageFileAttachment(body.messages);
-  const ollamaBaseUrlOverride =
-    normalizeOllamaBaseUrl(body.ollamaBaseUrl) ?? undefined;
-  const ollamaTagsEndpointOverride = deriveOllamaTagsEndpoint(
-    ollamaBaseUrlOverride,
+  const authRole = body.authRole?.trim().toLowerCase();
+  const session = await getMockAuthSession(
+    authRole && isAppRole(authRole) ? authRole : "user",
   );
-  let modelIdOverride: string | undefined;
 
-  if (providerCandidate === "ollama" && hasImageAttachment) {
-    const resolvedVisionModel = await resolveOllamaVisionModel({
-      tagsEndpointOverride: ollamaTagsEndpointOverride,
-    });
-    if ("errorMessage" in resolvedVisionModel) {
-      return badRequest(resolvedVisionModel.errorMessage);
-    }
+  const normalizedOllamaBaseUrl = normalizeOllamaBaseUrl(body.ollamaBaseUrl);
 
-    modelIdOverride = resolvedVisionModel.modelId;
-  }
-
-  let modelConfig: ReturnType<typeof getChatModelConfig>;
+  let modelConfig: ChatModelConfig;
   try {
-    modelConfig = getChatModelConfig({
+    const candidates = getChatModelCandidates({
       provider: providerOverride,
       openaiApiKey: body.openaiApiKey,
-      modelId: modelIdOverride,
-      baseUrl:
-        providerCandidate === "ollama" ? ollamaBaseUrlOverride : undefined,
+      baseUrl: providerOverride === "ollama" ? normalizedOllamaBaseUrl ?? undefined : undefined,
     });
+    modelConfig = candidates[0];
   } catch (error) {
     return Response.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 
-  const normalizedMessages = await normalizeMessagesForFileAttachments(
-    body.messages,
-  );
-  const modelMessages = await convertToModelMessages(normalizedMessages);
+  const coordinatorDecision = routeConversation({
+    messages: body.messages,
+    session,
+  });
 
-  if (featureMode === "mcp") {
-    return streamWithMcpTools({
-      model: modelConfig.model,
+  if (coordinatorDecision.type === "deny") {
+    return createStaticAgentResponse({
+      text: coordinatorDecision.message,
+      agent: "coordinator",
+      accessRole: session.role,
+      originalMessages: body.messages,
       provider: modelConfig.provider,
-      messages: modelMessages,
-      mcpServerUrlOverride:
-        normalizeMcpServerUrl(body.mcpServerUrl) ?? undefined,
+      modelId: modelConfig.modelId,
     });
   }
 
-  if (featureMode === "multi-agent") {
-    return streamWithMultiAgentPipeline({
-      model: modelConfig.model,
-      provider: modelConfig.provider,
-      messages: modelMessages,
-    });
+  switch (coordinatorDecision.specialist) {
+    case "manager":
+      return runManagerAgent({
+        model: modelConfig.model,
+        modelId: modelConfig.modelId,
+        provider: modelConfig.provider,
+        messages: body.messages,
+        session,
+        onRunStats: handleAgentLogger,
+      });
+    case "employee":
+      return runEmployeeAgent({
+        model: modelConfig.model,
+        modelId: modelConfig.modelId,
+        provider: modelConfig.provider,
+        messages: body.messages,
+        session,
+        onRunStats: handleAgentLogger,
+      });
   }
-
-  const result = streamText({
-    model: modelConfig.model,
-    system: FEATURE_SYSTEM_PROMPTS[featureMode],
-    messages: modelMessages,
-    tools: getToolsForMode(featureMode),
-    // Enable multi-step loops only for tool-based modes.
-    stopWhen:
-      featureMode === "tool" || featureMode === "agent"
-        ? stepCountIs(8)
-        : undefined,
-    temperature: featureMode === "prompt" ? 0 : undefined,
-  });
-
-  return result.toUIMessageStreamResponse({
-    onError: (error) => formatStreamError(error, modelConfig.provider),
-  });
 }

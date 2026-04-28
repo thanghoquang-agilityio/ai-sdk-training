@@ -1,38 +1,39 @@
+import {
+  API_COMMON_ERROR_COPY,
+  OLLAMA_VALIDATION_API_COPY,
+} from "@/constants/api";
 import { normalizeOllamaBaseUrl } from "@/lib/ollama-url";
-import { getErrorMessage } from "@/utils/error-message";
-
-type ValidateOllamaUrlRequestBody = {
-  baseUrl?: string;
-};
+import type { OllamaUrlValidationRequestBody } from "@/types/api";
+import { getErrorMessage } from "@/utils/error";
 
 function badRequest(message: string) {
   return Response.json({ ok: false, message }, { status: 400 });
 }
 
 export async function POST(req: Request) {
-  let body: ValidateOllamaUrlRequestBody;
+  let body: OllamaUrlValidationRequestBody;
 
   try {
-    body = (await req.json()) as ValidateOllamaUrlRequestBody;
+    body = (await req.json()) as OllamaUrlValidationRequestBody;
   } catch {
-    return badRequest("Invalid JSON body.");
+    return badRequest(API_COMMON_ERROR_COPY.invalidJsonBody);
   }
 
   const baseUrl = normalizeOllamaBaseUrl(body.baseUrl);
   if (!baseUrl) {
-    return badRequest("`baseUrl` must be a valid http/https URL.");
+    return badRequest(OLLAMA_VALIDATION_API_COPY.invalidBaseUrl);
   }
 
   try {
-    const tagsUrl = new URL("/api/tags", baseUrl).toString();
+    const tagsUrl = new URL(OLLAMA_VALIDATION_API_COPY.tagsPath, baseUrl).toString();
     const response = await fetch(tagsUrl, {
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(OLLAMA_VALIDATION_API_COPY.requestTimeoutMs),
       cache: "no-store",
     });
 
     if (!response.ok) {
       return badRequest(
-        `Ollama tags endpoint returned ${response.status}. Check tunnel URL.`,
+        `${OLLAMA_VALIDATION_API_COPY.tagsEndpointErrorPrefix} ${response.status}. ${OLLAMA_VALIDATION_API_COPY.tagsEndpointErrorSuffix}`,
       );
     }
 
@@ -44,16 +45,16 @@ export async function POST(req: Request) {
 
     return Response.json({
       ok: true,
-      message: "Ollama URL verified.",
+      message: OLLAMA_VALIDATION_API_COPY.verified,
       normalizedBaseUrl: baseUrl,
       details:
         modelCount > 0
-          ? `Connected successfully. Detected ${modelCount} model(s).`
-          : "Connected successfully. No models were listed.",
+          ? `${OLLAMA_VALIDATION_API_COPY.detectedModelsPrefix} ${modelCount} model(s).`
+          : OLLAMA_VALIDATION_API_COPY.noModelsDetected,
     });
   } catch (error) {
     return badRequest(
-      `Cannot connect to Ollama URL: ${getErrorMessage(error)}`,
+      `${OLLAMA_VALIDATION_API_COPY.connectionErrorPrefix} ${getErrorMessage(error)}`,
     );
   }
 }

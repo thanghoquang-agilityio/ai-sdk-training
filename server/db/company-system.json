@@ -1,0 +1,220 @@
+{
+  "teams": [
+    {
+      "teamId": "TEAM-ID-1",
+      "name": "Flash",
+      "id": "qb6L3T44UXs"
+    },
+    {
+      "teamId": "TEAM-ID-2",
+      "name": "Space",
+      "id": "7CNXGv-cRxg"
+    }
+  ],
+  "employees": [
+    {
+      "employeeId": "EMP-1001",
+      "name": "Thang Ho Quang",
+      "email": "thang.hoquang@asnet.com.vn",
+      "avatar": "https://api.dicebear.com/7.x/adventurer/svg?seed=thang.hoquang%40asnet.com.vn",
+      "teamId": "TEAM-ID-1",
+      "managerEmployeeId": "EMP-1006",
+      "timeZone": "Asia/Ho_Chi_Minh",
+      "id": "0Hndw8wANdE"
+    },
+    {
+      "employeeId": "EMP-1006",
+      "name": "Ni Ngo",
+      "email": "ni.ngo@asnet.com.vn",
+      "avatar": "https://api.dicebear.com/7.x/adventurer/svg?seed=ni.ngo%40asnet.com.vn",
+      "teamId": "TEAM-ID-1",
+      "managerEmployeeId": "EMP-1010",
+      "timeZone": "Asia/Ho_Chi_Minh",
+      "id": "TtqYwRT3nHU"
+    },
+    {
+      "employeeId": "EMP-1007",
+      "name": "Mia Nguyen",
+      "email": "mia.nguyen@asnet.com.vn",
+      "avatar": "https://api.dicebear.com/7.x/adventurer/svg?seed=mia.nguyen%40asnet.com.vn",
+      "teamId": "TEAM-ID-1",
+      "managerEmployeeId": "EMP-1006",
+      "timeZone": "Asia/Ho_Chi_Minh",
+      "id": "bKHTe2m1nws"
+    },
+    {
+      "employeeId": "EMP-1008",
+      "name": "An Pham",
+      "email": "an.pham@asnet.com.vn",
+      "avatar": "https://api.dicebear.com/7.x/adventurer/svg?seed=an.pham%40asnet.com.vn",
+      "teamId": "TEAM-ID-1",
+      "managerEmployeeId": "EMP-1006",
+      "timeZone": "Asia/Ho_Chi_Minh",
+      "id": "5VAyLcCe7zw"
+    },
+    {
+      "employeeId": "EMP-1010",
+      "name": "Avery Ross",
+      "email": "avery.ross@asnet.com.vn",
+      "avatar": "https://api.dicebear.com/7.x/adventurer/svg?seed=avery.ross%40asnet.com.vn",
+      "teamId": "TEAM-ID-2",
+      "managerEmployeeId": null,
+      "timeZone": "Asia/Ho_Chi_Minh",
+      "id": "oW4RsGFJDbA"
+    }
+  ],
+  "leave-entitlements": [
+    {
+      "employeeId": "EMP-1001",
+      "annual": 14,
+      "sick": 5,
+      "personal": 2,
+      "id": "5QZ95MKjY5g"
+    },
+    {
+      "employeeId": "EMP-1006",
+      "annual": 16,
+      "sick": 5,
+      "personal": 3,
+      "id": "m84qfT_1ahY"
+    },
+    {
+      "employeeId": "EMP-1007",
+      "annual": 12,
+      "sick": 4,
+      "personal": 2,
+      "id": "g7AEPNlKfPw"
+    },
+    {
+      "employeeId": "EMP-1008",
+      "annual": 13,
+      "sick": 5,
+      "personal": 2,
+      "id": "nxM9z0yr6Jg"
+    },
+    {
+      "employeeId": "EMP-1010",
+      "annual": 18,
+      "sick": 6,
+      "personal": 3,
+      "id": "A69HY7IT7Qo"
+    }
+  ],
+  "role-profiles": [
+    {
+      "role": "user",
+      "employeeId": "EMP-1001",
+      "id": "KP2jMZUyhSQ"
+    },
+    {
+      "role": "manager",
+      "employeeId": "EMP-1006",
+      "id": "Pv9Amazn7K8"
+    }
+  ],
+  "time-off-requests": [
+    {
+      "id": "REQ-3001",
+      "employeeId": "EMP-1001",
+      "leaveType": "annual",
+      "startDate": "2026-05-08",
+      "endDate": "2026-05-09",
+      "days": 2,
+      "status": "approved",
+      "reason": "Family trip",
+      "reviewComment": "Approved. Enjoy your trip.",
+      "createdAt": "2026-04-01T08:15:00.000Z",
+      "updatedAt": "2026-04-02T03:10:00.000Z"
+    },
+    {
+      "id": "REQ-3002",
+      "employeeId": "EMP-1001",
+      "leaveType": "sick",
+      "startDate": "2026-04-10",
+      "endDate": "2026-04-10",
+      "days": 1,
+      "status": "approved",
+      "reason": "Fever and rest day",
+      "reviewComment": "Take care and recover well.",
+      "createdAt": "2026-04-09T22:00:00.000Z",
+      "updatedAt": "2026-04-10T02:20:00.000Z"
+    },
+    {
+      "id": "REQ-3003",
+      "employeeId": "EMP-1001",
+      "leaveType": "annual",
+      "startDate": "2026-06-15",
+      "endDate": "2026-06-16",
+      "days": 2,
+      "status": "pending",
+      "reason": "Beach vacation",
+      "createdAt": "2026-04-16T01:00:00.000Z",
+      "updatedAt": "2026-04-16T01:00:00.000Z"
+    },
+    {
+      "id": "REQ-3004",
+      "employeeId": "EMP-1001",
+      "leaveType": "personal",
+      "startDate": "2026-05-27",
+      "endDate": "2026-05-27",
+      "days": 1,
+      "status": "approved",
+      "reason": "Family appointment",
+      "reviewComment": "Approved.",
+      "createdAt": "2026-04-14T02:10:00.000Z",
+      "updatedAt": "2026-04-14T05:30:00.000Z"
+    },
+    {
+      "id": "REQ-3005",
+      "employeeId": "EMP-1007",
+      "leaveType": "annual",
+      "startDate": "2026-05-12",
+      "endDate": "2026-05-13",
+      "days": 2,
+      "status": "pending",
+      "reason": "Family wedding",
+      "createdAt": "2026-04-18T03:10:00.000Z",
+      "updatedAt": "2026-04-18T03:10:00.000Z"
+    },
+    {
+      "id": "REQ-3006",
+      "employeeId": "EMP-1008",
+      "leaveType": "personal",
+      "startDate": "2026-04-24",
+      "endDate": "2026-04-24",
+      "days": 1,
+      "status": "pending",
+      "reason": "Apartment paperwork",
+      "createdAt": "2026-04-19T06:30:00.000Z",
+      "updatedAt": "2026-04-19T06:30:00.000Z"
+    },
+    {
+      "id": "REQ-3007",
+      "employeeId": "EMP-1007",
+      "leaveType": "annual",
+      "startDate": "2026-04-29",
+      "endDate": "2026-04-29",
+      "days": 1,
+      "status": "approved",
+      "reason": "Personal recharge day",
+      "reviewComment": "Approved.",
+      "createdAt": "2026-04-15T03:20:00.000Z",
+      "updatedAt": "2026-04-15T07:10:00.000Z"
+    },
+    {
+      "id": "REQ-3008",
+      "employeeId": "EMP-1008",
+      "leaveType": "annual",
+      "startDate": "2026-05-20",
+      "endDate": "2026-05-21",
+      "days": 2,
+      "status": "approved",
+      "reason": "Long weekend with friends",
+      "reviewComment": "Approved",
+      "createdAt": "2026-04-11T02:00:00.000Z",
+      "updatedAt": "2026-04-25T15:17:20.762Z"
+    }
+  ],
+  "updatedAt": "2026-04-22T08:49:39.560Z",
+  "$schema": "./node_modules/json-server/schema.json"
+}

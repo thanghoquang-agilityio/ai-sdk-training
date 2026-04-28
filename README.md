@@ -1,201 +1,220 @@
-# AI SDK Playground (Next.js)
+# Employee Assistant
 
-Playground app to test **AI SDK UI** + **AI SDK Core** features in one place.
+A focused Next.js chat application for personal time-off management. Employees can check balances, list requests, submit new requests, and cancel existing ones — all through a conversational UI backed by role-aware AI agents.
 
-## Included demos
+---
 
-- Core chat streaming (`streamText`)
-- Tool mode (single tool)
-- Agent mode (multi-tool chain via `stopWhen + stepCountIs`)
-- Multi-agent mode (planner + researcher + writer pipeline)
-- Prompt mode (deterministic formatted outputs)
-- MCP tools integration (`@ai-sdk/mcp`)
-- Chat history persistence (localStorage)
-- File-aware chat attachments (image/PDF/DOCX/TXT/MD/CSV/JSON)
-- Image generation lab (`generateImage`)
+## Tech Stack
 
-## Routes
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16.1.6 (App Router) |
+| Language | TypeScript 5 |
+| React | 19.2.3 |
+| Package manager | pnpm 10 |
+| AI SDK | Vercel AI SDK v6 (`ai`, `@ai-sdk/react`) |
+| LLM providers | OpenAI (`@ai-sdk/openai`) / Ollama (OpenAI-compatible) |
+| Validation | Zod v4 |
+| Styling | Tailwind CSS v4 |
+| Mock REST API | json-server v1 (flat JSON file) |
 
-- `/` overview
-- `/chat` chat lab (with persistence + file attachments)
-- `/image` image generation lab
+---
 
-## Stack
+## Project Structure
 
-- Next.js (App Router)
-- AI SDK: `ai`, `@ai-sdk/react`
-- Providers: `@ai-sdk/openai`, Ollama via OpenAI-compatible endpoint
-- MCP client: `@ai-sdk/mcp`
-- File parsing: `pdf-parse`, `mammoth`
-- Validation schemas: `zod`
+```
+src/
+├── app/                        # Next.js App Router pages and API routes
+│   └── api/
+│       ├── chat/               # Main agent chat endpoint (POST)
+│       ├── validate-openai-key/
+│       └── validate-ollama-url/
+│
+├── agents/
+│   ├── chat-core/              # Shared agent runtime (provider-agnostic)
+│   │   ├── index.ts            # Public barrel — all external imports go here
+│   │   ├── types/              # Shared TypeScript types
+│   │   ├── logger/             # Agent run-stats logging
+│   │   ├── services/
+│   │   │   ├── coordinator.ts  # Routes message to employee or manager agent
+│   │   │   ├── runner.ts       # Dispatches AgentRunInput → streamAgent
+│   │   │   └── streaming.ts    # Core LLM streaming pipeline (streamText)
+│   │   ├── utils/
+│   │   │   └── response.ts     # HTTP response builders (static + streamed)
+│   │   ├── observers/
+│   │   │   ├── policy.ts       # Runtime config from AGENT_* env vars
+│   │   │   ├── metrics.ts      # Token usage accounting
+│   │   │   └── token-math.ts   # Token count estimation (~4 chars/token)
+│   │   └── prompt/
+│   │       └── builder.ts      # Context windowing + system prompt assembly
+│   │
+│   ├── employee/               # Employee specialist agent
+│   │   ├── run.ts              # Entry point — builds prompt + tools, calls runAgent
+│   │   ├── prompt/             # Static system prompt + runtime conversation builder
+│   │   └── tools/              # read (balance, list, date-picker) + mutation (submit, cancel)
+│   │
+│   ├── manager/                # Manager specialist agent
+│   │   ├── run.ts
+│   │   ├── prompt/
+│   │   └── tools/              # read (team list, requests) + mutation (approve, reject)
+│   │
+│   └── handlers/               # Business logic called by tools
+│       ├── time-off/           # balance, queries, mutations, payload builders
+│       └── common/             # date utilities
+│
+├── components/
+│   ├── chat/                   # ChatComposer, ProviderSelector, tool cards
+│   ├── transcript/             # Message rendering, tool output tables
+│   ├── workspace/              # App shell, sidebar, auth panel
+│   └── ui/                     # Primitives: Button, Input, Card, Badge, etc.
+│
+├── hooks/                      # useWorkspaceApp, useProvider, useThreads, etc.
+├── constants/                  # All copy, config, and magic strings
+├── lib/                        # ai-provider, auth, db, runtime-env
+├── services/company-system/    # HTTP client for json-server CRUD
+├── types/                      # Shared API and domain types
+└── utils/                      # className, error, avatar, message helpers
 
-## Quick start
+server/
+├── db/
+│   ├── company-system.json     # Live database (mutated at runtime)
+│   └── company-system.seed.json
+└── scripts/
+    └── company-system-server.mjs  # Starts json-server on port 4100
 
-1. Install dependencies
+docs/
+└── mermaid/                    # Architecture and flow diagrams
+```
+
+---
+
+## How It Works
+
+```
+User message
+    │
+    ▼
+POST /api/chat
+    │
+    ├─ coordinator.ts  ← regex routing, no LLM call
+    │       │
+    │       ├──► employee agent  (personal leave, balance)
+    │       └──► manager agent   (team approvals, reports)
+    │
+    └─ streaming.ts  ← streamText → toUIMessageStreamResponse
+                           ↑
+                    observers/ (policy, metrics, token-math)
+                    prompt/builder (context windowing)
+```
+
+The UI uses `useChat` from `@ai-sdk/react` with a custom transport. The protocol is the **Vercel AI SDK UI Message Stream** — not raw SSE or WebSocket. Tool results are returned as structured JSON and rendered as cards/tables by the FE; the LLM never exposes raw JSON to the user.
+
+---
+
+## Quick Start
 
 ```bash
+# 1. Install dependencies
 pnpm install
-```
 
-2. Create env file
-
-```bash
+# 2. Copy env template
 cp .env.example .env.local
+
+# 3. Start everything (Next.js + json-server + Ollama if installed)
+pnpm dev
 ```
 
-3. Pull Ollama models (free local)
+Open `http://localhost:3000`
 
-```bash
-pnpm run ollama:pull
-pnpm run ollama:pull:vision
-```
+---
 
-4. Start app
+## Environment Variables
 
-```bash
-pnpm run dev
-```
-
-Open: `http://localhost:3000`
-
-Mock production behavior locally (for testing production UI/runtime rules):
-
-```bash
-pnpm run dev:mock-production
-```
-
-This enables `NEXT_PUBLIC_MOCK_PRODUCTION=true` so local behaves like production defaults.
-
-## Local run + Cloudflare Quick Tunnel (public URL)
-
-Use this when app is deployed on Vercel but you want to route chat to your local Ollama + MCP.
-
-1. Start local services
-
-```bash
-# Terminal A
-ollama serve
-
-# Terminal B
-pnpm run dev:mcp
-```
-
-2. Open Cloudflare Quick Tunnels
-
-```bash
-# Terminal C (Ollama)
-pnpm run tunnel:ollama
-# or: cloudflared tunnel --url http://127.0.0.1:11434 --http-host-header 127.0.0.1:11434
-
-# Terminal D (MCP HTTP server)
-pnpm run tunnel:mcp
-# or: cloudflared tunnel --url http://127.0.0.1:4001 --http-host-header 127.0.0.1:4001
-```
-
-3. Copy the 2 public URLs from cloudflared output:
-
-- Ollama tunnel: `https://xxxx.trycloudflare.com`
-- MCP tunnel: `https://yyyy.trycloudflare.com`
-
-4. In your Vercel app `/chat`:
-
-- Select provider: **Ollama**
-- Enter **Ollama base URL**: `https://xxxx.trycloudflare.com` (app auto-adds `/v1`)
-- If mode is **MCP**, enter **MCP server URL**: `https://yyyy.trycloudflare.com` (app auto-adds `/mcp`)
-- Click **Verify URL** / **Verify URLs** before sending chat messages
-
-5. Smoke test public URLs
-
-```bash
-curl https://xxxx.trycloudflare.com/api/tags
-curl -i https://yyyy.trycloudflare.com/mcp
-```
-
-Notes:
-
-- `GET /mcp` returns `405` is expected (MCP uses POST for requests).
-- If you see `403 Forbidden`, make sure `--http-host-header` is set (Ollama and MCP in this project validate host headers).
-- Quick Tunnel URLs change after restart. Refill new URLs in the app.
-- For stable URLs, use Cloudflare Named Tunnel + your domain.
-
-## Environment
-
-Default local chat with Ollama:
+### Ollama (local, default in development)
 
 ```env
 AI_PROVIDER=ollama
-AI_MODEL=qwen2.5:3b
+OLLAMA_BASE_URL=http://127.0.0.1:11434/v1
 OLLAMA_MODEL=qwen2.5:3b
-OLLAMA_VISION_MODEL=gemma3:4b
-OPENAI_API_KEY=ollama
-OPENAI_BASE_URL=http://localhost:11434/v1
 ```
 
-Optional OpenAI mode:
+> The `/v1` suffix is required. The app normalises it automatically but being explicit avoids surprises.
+
+### OpenAI (required in production)
 
 ```env
 AI_PROVIDER=openai
-AI_MODEL=gpt-4o-mini
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
-NEXT_PUBLIC_OPENAI_SERVER_READY=true
+OPENAI_MODEL=gpt-4o-mini
+NEXT_PUBLIC_OPENAI_SERVER_READY=true   # skips UI key-entry when key is set server-side
 ```
 
-Optional extra features:
+### Agent tuning (optional)
 
 ```env
-# Image generation model (OpenAI image lab)
-OPENAI_IMAGE_MODEL=gpt-image-1
-
-# MCP integration
-# If omitted, app uses built-in local stdio MCP fallback server
-# MCP_SERVER_URL=https://your-mcp-server.example.com/mcp
-# MCP_AUTH_TOKEN=your_optional_bearer_token
-# MCP_STDIO_COMMAND=node
-# MCP_STDIO_SERVER_PATH=scripts/mcp-demo-server-stdio.mjs
+AGENT_STOP_STEP_COUNT=6       # max tool-use steps per turn
+AGENT_TEMPERATURE=0.2
+AGENT_MESSAGE_WINDOW=14       # messages kept in full before compaction
+AGENT_MAX_RETRIES=2
+AGENT_MAX_OUTPUT_TOKENS=1200
+AGENT_RUN_STATS_LOG=1         # enable token/tool logging in production
 ```
 
-Production behavior:
-
-- Default provider is **OpenAI**.
-- If you switch production to **Ollama**, enter URLs in chat UI inputs:
-  - **Ollama base URL** (e.g. `https://your-tunnel.example.com`; app auto-adds `/v1`)
-  - **MCP server URL** (required only when using MCP mode)
-  - Click **Verify URL(s)** first; chat input stays disabled until verification succeeds
-- You can still keep env defaults if needed:
+### Company system server (optional overrides)
 
 ```env
-AI_PROVIDER=ollama
-OPENAI_BASE_URL=https://your-ollama-tunnel.example.com/v1
-OLLAMA_TAGS_ENDPOINT=https://your-ollama-tunnel.example.com/api/tags
-MCP_SERVER_URL=https://your-mcp-server.example.com/mcp
+COMPANY_SYSTEM_BASE_URL=http://127.0.0.1:4100
+COMPANY_SYSTEM_HOST=127.0.0.1
+COMPANY_SYSTEM_PORT=4100
 ```
 
-## Attachment behavior in chat
-
-- **Images**: kept as image parts. With Ollama provider, route tries `OLLAMA_VISION_MODEL` first, then auto-falls back to installed vision models.
-- **PDF / DOCX / text-like files**: server extracts text and injects it into prompt context.
-- Unsupported file formats return a fallback text note asking for plain text summary.
-
-## Provider check for image generation page (`/image`)
-
-- `openai`: ✅ Supported
-- `ollama`: ❌ Not supported on this page (this page intentionally uses OpenAI image API only)
-- On `/image`, OpenAI key verification is required before `Generate image` is enabled.
+---
 
 ## Scripts
 
-- `pnpm run dev`: run web + Ollama + MCP demo HTTP server together
-- `pnpm run dev:mock-production`: run local with production-like behavior toggled on
-- `pnpm run dev:web`: run Next.js only
-- `pnpm run dev:ollama`: start Ollama only if not running
-- `pnpm run dev:mcp`: run local MCP demo HTTP server at `http://127.0.0.1:4001/mcp`
-- `pnpm run tunnel:ollama`: open Cloudflare Quick Tunnel for local Ollama (`11434`)
-- `pnpm run tunnel:mcp`: open Cloudflare Quick Tunnel for local MCP HTTP server (`4001`)
-- `pnpm run ollama:pull`: pull default local text model
-- `pnpm run ollama:pull:vision`: pull local vision model for chat image Q&A
-- `pnpm run mcp:demo`: run local MCP demo HTTP server manually
-- `pnpm run mcp:demo:stdio`: run local MCP demo stdio fallback server manually
-- `pnpm run lint`: lint
-- `pnpm run build`: production build
+| Script | What it does |
+|---|---|
+| `pnpm dev` | Start Next.js + json-server + Ollama concurrently |
+| `pnpm dev:web` | Next.js only |
+| `pnpm dev:company-system` | json-server on port 4100 |
+| `pnpm dev:ollama` | Start Ollama if installed and not already running |
+| `pnpm build` | Production build |
+| `pnpm start` | Start production server |
+| `pnpm lint` | ESLint |
+| `pnpm company-system:reset` | Restore `company-system.json` from seed |
+| `pnpm ollama:pull` | Pull default chat model (`qwen2.5:3b`) |
+| `pnpm ollama:pull:vision` | Pull vision model (`gemma3:4b`) |
+
+---
+
+## Provider Behaviour
+
+| Environment | Allowed providers | Key entry |
+|---|---|---|
+| Development | OpenAI + Ollama | Via sidebar UI or env |
+| Production (`NODE_ENV=production`) | OpenAI only | Via sidebar UI or `OPENAI_API_KEY` env |
+
+In production the provider selector is hidden (single option = no dropdown). If `NEXT_PUBLIC_OPENAI_SERVER_READY=true`, the UI skips manual key entry and uses the server-configured key directly.
+
+---
+
+## Database
+
+All data lives in `server/db/company-system.json` and is served by json-server at `http://127.0.0.1:4100`.
+
+Collections: `teams`, `employees`, `leave-entitlements`, `role-profiles`, `time-off-requests`.
+
+To reset to seed state:
+
+```bash
+pnpm company-system:reset
+```
+
+---
+
+## Notes
+
+- If Next.js shows stale Turbopack cache errors, delete `.next/` and rerun `pnpm dev`.
+- Slack webhook and token env vars are optional — only needed for the `createSlackReminder` tool.
+- `NEXT_PUBLIC_MOCK_PRODUCTION=true` simulates production mode locally (useful for testing the OpenAI-only provider restriction).

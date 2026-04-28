@@ -1,72 +1,98 @@
-import { Button } from "@/components/ui/button";
-import { Text } from "@/components/ui/text";
-import type { ToastNotification } from "@/hooks/use-toast";
-import { cn } from "@/utils/class-name";
+"use client";
 
-const TOAST_VARIANT_STYLES = {
-  info: "border-slate-200 bg-white text-slate-900",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  error: "border-red-200 bg-red-50 text-red-900",
-} as const;
+import { useEffect, useState } from "react";
 
-type ToastViewportProps = {
-  toasts: ToastNotification[];
-  onDismiss: (id: string) => void;
+export type ToastVariant = "success" | "error" | "info";
+
+type ToastProps = {
+  message: string;
+  variant?: ToastVariant;
+  durationMs?: number;
+  onDismiss: () => void;
 };
 
-function ToastItem({
-  toast,
+const ICON_BY_VARIANT: Record<ToastVariant, string> = {
+  success: "✓",
+  error: "✕",
+  info: "ℹ",
+};
+
+const STYLE_BY_VARIANT: Record<ToastVariant, string> = {
+  success:
+    "border-emerald-500/30 bg-emerald-500/12 text-emerald-300 shadow-[0_8px_32px_rgba(16,185,129,0.18)]",
+  error:
+    "border-red-500/30 bg-red-500/12 text-red-300 shadow-[0_8px_32px_rgba(239,68,68,0.18)]",
+  info:
+    "border-sky-500/30 bg-sky-500/12 text-sky-300 shadow-[0_8px_32px_rgba(14,165,233,0.18)]",
+};
+
+const ICON_BG_BY_VARIANT: Record<ToastVariant, string> = {
+  success: "bg-emerald-500/20 text-emerald-400",
+  error: "bg-red-500/20 text-red-400",
+  info: "bg-sky-500/20 text-sky-400",
+};
+
+const DEFAULT_DURATION_MS = 3500;
+
+export function Toast({
+  message,
+  variant = "success",
+  durationMs = DEFAULT_DURATION_MS,
   onDismiss,
-}: {
-  toast: ToastNotification;
-  onDismiss: (id: string) => void;
-}) {
+}: ToastProps) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+
+  useEffect(() => {
+    // Trigger enter animation on next frame.
+    const enterFrame = requestAnimationFrame(() => setIsVisible(true));
+
+    const dismissTimer = setTimeout(() => {
+      setIsLeaving(true);
+      // Wait for exit animation before unmounting.
+      setTimeout(onDismiss, 280);
+    }, durationMs);
+
+    return () => {
+      cancelAnimationFrame(enterFrame);
+      clearTimeout(dismissTimer);
+    };
+  }, [durationMs, onDismiss]);
+
   return (
-    <article
+    <div
       role="status"
       aria-live="polite"
-      className={cn(
-        "w-full rounded-xl border p-3 shadow-sm",
-        TOAST_VARIANT_STYLES[toast.variant],
-      )}
+      className={[
+        "fixed right-5 top-5 z-[9999] flex max-w-sm items-center gap-3 rounded-2xl border px-4 py-3 backdrop-blur-xl transition-all duration-280",
+        STYLE_BY_VARIANT[variant],
+        isVisible && !isLeaving
+          ? "translate-y-0 opacity-100"
+          : "-translate-y-3 opacity-0",
+      ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <Text variant="body" className="font-semibold">
-            {toast.title}
-          </Text>
-          {toast.description ? (
-            <Text variant="caption" className="text-current opacity-90">
-              {toast.description}
-            </Text>
-          ) : null}
-        </div>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-current hover:bg-black/5"
-          onClick={() => onDismiss(toast.id)}
-          aria-label="Dismiss notification"
-        >
-          x
-        </Button>
-      </div>
-    </article>
-  );
-}
-
-export function ToastViewport({ toasts, onDismiss }: ToastViewportProps) {
-  if (toasts.length === 0) return null;
-
-  return (
-    <section className="pointer-events-none fixed right-4 top-4 z-50 w-full max-w-sm">
-      <div className="pointer-events-auto flex flex-col gap-2">
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />
-        ))}
-      </div>
-    </section>
+      <span
+        className={[
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+          ICON_BG_BY_VARIANT[variant],
+        ].join(" ")}
+      >
+        {ICON_BY_VARIANT[variant]}
+      </span>
+      <span className="font-dm-sans text-sm font-medium leading-snug">
+        {message}
+      </span>
+      <button
+        type="button"
+        className="ml-auto shrink-0 rounded-lg p-1 opacity-60 transition hover:opacity-100"
+        onClick={() => {
+          setIsLeaving(true);
+          setTimeout(onDismiss, 280);
+        }}
+        aria-label="Dismiss"
+      >
+        ✕
+      </button>
+    </div>
   );
 }

@@ -1,23 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
 @import "tailwindcss";
 
 :root {
-    --background: #f4f8ff;
-    --foreground: #0f172a;
+  --background: #0c1024;
+  --foreground: #f8fafc;
 }
 
 @theme inline {
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-syne: 'Syne', sans-serif;
+  --font-dm-sans: 'DM Sans', sans-serif;
+  --color-brand-600: rgb(100, 80, 200);
+  --color-brand-700: #3b2a8a;
+  --color-brand-800: rgb(80, 60, 160);
+  --color-brand-900: #1e1040;
+  --color-brand-dark-100: #1a1035;
+  --color-brand-dark-200: #16112e;
+}
+
+html,
+body {
+  min-height: 100%;
 }
 
 body {
-    background:
-        radial-gradient(circle at 20% 0%, #dbeafe 0%, transparent 40%),
-        radial-gradient(circle at 100% 0%, #e2e8f0 0%, transparent 35%),
-        var(--background);
-    color: var(--foreground);
-    font-family:
-        system-ui,
-        -apple-system,
-        sans-serif;
+  background: radial-gradient(1200px 700px at -10% -15%, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0) 60%),
+    radial-gradient(1100px 650px at 110% 20%, rgba(14, 165, 233, 0.18) 0%, rgba(14, 165, 233, 0) 62%),
+    linear-gradient(135deg, #0c1024 0%, #1a1739 42%, #102033 100%);
+  background-attachment: fixed;
+  color: var(--foreground);
+  font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(124, 58, 237, 0.3);
+}
+
+@keyframes tdot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
