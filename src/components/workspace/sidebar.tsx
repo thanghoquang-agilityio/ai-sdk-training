@@ -105,17 +105,21 @@ export function ThreadSidebar({
             />
           </div>
 
-          {allThreads.length > 1 && (
-            <div>
-              <div className="mb-2 px-2">
-                <Text as="p" variant="eyebrowMuted">
-                  {SIDEBAR_COPY.recentChatsLabel}
-                </Text>
-              </div>
-              <div className="space-y-2">
-                {allThreads
-                  .filter((t) => t.id !== activeThread.id)
-                  .map((thread) => (
+          {(() => {
+            const recentThreads = allThreads.filter(
+              (t) => t.id !== activeThread.id && t.messages.length > 0,
+            );
+            if (recentThreads.length === 0) return null;
+
+            return (
+              <div>
+                <div className="mb-2 px-2">
+                  <Text as="p" variant="eyebrowMuted">
+                    {SIDEBAR_COPY.recentChatsLabel}
+                  </Text>
+                </div>
+                <div className="space-y-2">
+                  {recentThreads.map((thread) => (
                     <ThreadCard
                       key={thread.id}
                       thread={thread}
@@ -124,9 +128,10 @@ export function ThreadSidebar({
                       onDelete={() => onDeleteThread(thread.id)}
                     />
                   ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </aside>
