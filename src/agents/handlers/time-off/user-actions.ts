@@ -35,6 +35,7 @@ export type SubmitMyTimeOffRequestInput = {
   endDate: string;
   reason: string;
   note?: string;
+  dryRun?: boolean;
 };
 
 export type RequestQueryInput = {
@@ -136,6 +137,13 @@ export async function submitMyTimeOffRequest(
         message: `You only have ${balance?.remaining ?? 0} ${input.leaveType} day${balance?.remaining === 1 ? "" : "s"} remaining.`,
       };
     }
+  }
+
+  if (input.dryRun) {
+    return {
+      ok: true,
+      message: "Validation successful. You can now proceed with submission.",
+    };
   }
 
   const now = new Date().toISOString();

@@ -1,4 +1,4 @@
-import { DATE_AGENT_TOOL_NAME, DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/date/tools/definitions";
+import { DATE_AGENT_TOOL_NAME, DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/specialists/date/tools/definitions";
 
 export const MANAGER_TOOL_NAME = {
   LIST_EMPLOYEES: "list_employees",

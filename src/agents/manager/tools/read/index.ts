@@ -2,7 +2,7 @@ import { tool, type LanguageModel } from "ai";
 import { z } from "zod";
 import type { MockAuthSession } from "@/lib/auth/session";
 import { listAllEmployees, listTeamMembers, listTeamTimeOffRequests } from "@/agents/handlers/time-off";
-import { createDateResolutionTool } from "@/agents/date/tools/read/resolution";
+import { createDateResolutionTool } from "@/agents/specialists/date/tools/read/resolution";
 import { MANAGER_TOOL_DESCRIPTION, MANAGER_TOOL_NAME } from "../common/definitions";
 
 const OPTIONAL_STATUS_SCHEMA = z
