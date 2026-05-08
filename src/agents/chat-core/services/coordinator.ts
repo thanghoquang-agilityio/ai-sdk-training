@@ -6,7 +6,7 @@ import type { CoordinatorDecision } from "../types";
 import { getTextParts } from "@/utils/message";
 
 const routeSchema = z.object({
-  specialist: z.enum(["employee", "manager", "date"]),
+  specialist: z.enum(["employee", "manager", "out_of_scope"]),
 });
 
 type RouteConversationInput = {
@@ -23,13 +23,23 @@ function getLatestUserText(messages: UIMessage[]): string {
 
 function buildRoutingSystemPrompt(session: MockAuthSession): string {
   const lines = [
-    "You are a routing coordinator. Classify which specialist agent should handle the user's message.",
+    "You are a routing coordinator for a Leave Management system.",
+    "Your job is to classify which specialist agent should handle the user's message, or identify if it is out of scope.",
     "",
-    "## Route hints",
-    "- employee: personal time-off — own leave balance, own request history, submit own request, cancel own request",
-    "- manager: team operations — approve or reject team requests, list team members, review team pending queue",
+    "## Specialist Scopes",
+    "- employee: Personal time-off queries (e.g., checking own leave balance, listing own requests, submitting or cancelling own leave).",
+    "- manager: Team management (e.g., approving/rejecting requests for direct reports, listing team members, reviewing pending team queue).",
     "",
-    'Default to "employee" for ambiguous or unclear messages.',
+    "## Out of Scope Examples",
+    'Anything NOT directly related to leave management or team attendance is "out_of_scope". Examples:',
+    "- Room or equipment booking.",
+    "- Payroll or salary queries.",
+    "- IT support or technical issues.",
+    "- General company information or policies unrelated to leave.",
+    "- Casual chat or non-work related topics.",
+    "",
+    'If the request is clearly unrelated to the specialists above, return "out_of_scope".',
+    'If the message is ambiguous but likely related to leave, default to "employee".',
   ];
 
   if (session.managedEmployees.length > 0) {
@@ -38,7 +48,7 @@ function buildRoutingSystemPrompt(session: MockAuthSession): string {
       "",
       "## Direct reports",
       names,
-      'Route to "manager" if the message mentions any of these names.',
+      'Route to "manager" if the message mentions any of these names in the context of leave approval or team oversight.',
     );
   }
 
@@ -56,6 +66,13 @@ export async function routeConversation(
     system: buildRoutingSystemPrompt(input.session),
     prompt: userText || "(no message)",
   });
+
+  if (object.specialist === "out_of_scope") {
+    return {
+      type: "deny",
+      message: `I'm sorry, I can only help with leave requests and team management. I don't have the capability to handle your request. Please contact the relevant department for assistance.`,
+    };
+  }
 
   if (object.specialist === "manager" && input.session.role !== "manager") {
     return {

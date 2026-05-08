@@ -8,12 +8,12 @@ import type {
 // ─── Prompt version maps ───
 import { employeePromptVersions } from "@/agents/employee/prompt";
 import { managerPromptVersions } from "@/agents/manager/prompt";
-import { datePromptVersions } from "@/agents/date/prompt";
+import { datePromptVersions } from "@/agents/specialists/date/prompt";
 
 // ─── Tool factory maps ───
 import { employeeToolFactories } from "@/agents/employee/tools";
 import { managerToolFactories } from "@/agents/manager/tools";
-import { dateToolFactories } from "@/agents/date/tools";
+import { dateToolFactories } from "@/agents/specialists/date/tools";
 
 // ─── Tool Definitions ───
 import {
@@ -24,7 +24,7 @@ import {
   MANAGER_TOOL_DESCRIPTION,
   MANAGER_TOOL_NAME,
 } from "@/agents/manager/tools/common/definitions";
-import { DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/date/tools/definitions";
+import { DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/specialists/date/tools/definitions";
 
 /* ================================================================
  * AGENT CONFIG — Single source of truth
@@ -37,25 +37,30 @@ export const AGENT_CONFIG: AgentConfigRegistry = {
         EMPLOYEE_TOOL_NAME.GET_MY_TIME_OFF_BALANCE,
         EMPLOYEE_TOOL_NAME.LIST_MY_TIME_OFF_REQUESTS,
         EMPLOYEE_TOOL_NAME.CONSULT_DATE_SPECIALIST,
+        EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE,
       ],
       mutation: [
+        EMPLOYEE_TOOL_NAME.VERIFY_MY_TIME_OFF_REQUEST,
         EMPLOYEE_TOOL_NAME.SUBMIT_MY_TIME_OFF_REQUEST,
         EMPLOYEE_TOOL_NAME.CANCEL_MY_TIME_OFF_REQUEST,
       ],
     },
     flow: [
-      "New leave request — follow EXACTLY in order:",
-      `  STEP A: Does the user's message contain ALL of: leave type + explicit date or date range + reason?`,
-      `    → YES to all three: call ${EMPLOYEE_TOOL_NAME.SUBMIT_MY_TIME_OFF_REQUEST} immediately. Do NOT call ${EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE}. Use YYYY-MM-DD dates only.`,
-      `  STEP B: Is the leave type unknown?`,
-      `    → ask for leave type in a single short sentence. Do not ask about dates or reason yet.`,
-      `  STEP C: Leave type is known but NO explicit dates are provided?`,
-      `    → call ${EMPLOYEE_TOOL_NAME.CONSULT_DATE_SPECIALIST} first to get suggestions. Present these suggestions and show the date picker via ${EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE}.`,
-      `  STEP D: Leave type + dates are present but reason is missing?`,
-      `    → ask for reason in a single short sentence.`,
-      `5. After ${EMPLOYEE_TOOL_NAME.SUBMIT_MY_TIME_OFF_REQUEST} is called, do not write confirmation text — the UI handles approval.`,
-      `6. Cancellation: if leave type + date are specified, call ${EMPLOYEE_TOOL_NAME.CANCEL_MY_TIME_OFF_REQUEST} immediately.`,
-      `7. Date Handling: You MUST call ${EMPLOYEE_TOOL_NAME.CONSULT_DATE_SPECIALIST} for relative dates or month+day queries. Do NOT guess dates.`,
+      "Global Rules:",
+      `  - VALID LEAVE TYPES: "annual", "sick", "personal", "unpaid". If the user mentions "sick leave", it is VALID.`,
+      `  - PAST DATES: If the user provides dates in the past (e.g. "April 30" when today is May 8), you MUST explain that dates are in the past AND IMMEDIATELY call ${EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE}.`,
+      `  - NO TEXT SUGGESTIONS: NEVER suggest dates in text (e.g. "How about next Monday?"). ALWAYS show the date picker tool instead.`,
+      `  - NO TEXT CONFIRMATION: NEVER ask "Is this correct?" or "Do you want to proceed?" in text. If you have the info, call the tool IMMEDIATELY.`,
+      `  - NEVER validate dates or balances in text. ALWAYS call a tool first.`,
+      `  - VERIFY BEFORE SUBMIT: Call ${EMPLOYEE_TOOL_NAME.VERIFY_MY_TIME_OFF_REQUEST} before ${EMPLOYEE_TOOL_NAME.SUBMIT_MY_TIME_OFF_REQUEST}.`,
+      `  - NO CONFIRMATION TEXT: Simply call the tool and STOP.`,
+      "",
+      "Workflow for Leave Requests:",
+      `  1. ERROR HANDLING: If dates are missing, invalid (past), or verification fails, IMMEDIATELY call ${EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE} to show the picker. NEVER ask for permission.`,
+      `  2. PRE-FLIGHT VERIFICATION: Once you have absolute dates (YYYY-MM-DD), call ${EMPLOYEE_TOOL_NAME.VERIFY_MY_TIME_OFF_REQUEST} to check for overlaps and balance.`,
+      `    → If ok: true, call ${EMPLOYEE_TOOL_NAME.SUBMIT_MY_TIME_OFF_REQUEST} to show the final "Confirm" UI and save to database.`,
+      `    → If ok: false, explain why and IMMEDIATELY show the date picker via ${EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE}. STOP.`,
+      `  3. MISSING INFO: Ask for leave type or reason if missing before proceeding to verification.`,
     ],
     label: "Employee Assistant",
   },
@@ -84,7 +89,7 @@ export const AGENT_CONFIG: AgentConfigRegistry = {
   date: {
     promptVersion: "v1",
     tools: {
-      read: ["consult_date_agent"]
+      read: [EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE],
     },
     label: "Date Specialist",
   },
@@ -102,11 +107,12 @@ export const PROMPT_VERSIONS: Record<
   date: datePromptVersions,
 };
 
-export const TOOL_FACTORIES: Record<SpecialistAgentName, AgentToolFactoryMap> = {
-  employee: employeeToolFactories,
-  manager: managerToolFactories,
-  date: dateToolFactories,
-};
+export const TOOL_FACTORIES: Record<SpecialistAgentName, AgentToolFactoryMap> =
+  {
+    employee: employeeToolFactories,
+    manager: managerToolFactories,
+    date: dateToolFactories,
+  };
 
 export const DESCRIPTIONS: Record<string, string> = {
   ...EMPLOYEE_TOOL_DESCRIPTION,

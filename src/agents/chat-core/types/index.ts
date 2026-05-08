@@ -63,5 +63,5 @@ export type AgentLogger = {
 };
 
 export type CoordinatorDecision =
-  | { type: "delegate"; specialist: "employee" | "manager" | "date" }
+  | { type: "delegate"; specialist: "employee" | "manager" }
   | { type: "deny"; message: string };

@@ -4,11 +4,7 @@ import {
   type UIMessage,
 } from "ai";
 import type { AppRole } from "@/lib/auth/session";
-import type {
-  AgentMetadata,
-  AgentName,
-  MessageMetadata,
-} from "../types";
+import type { AgentMetadata, AgentName, MessageMetadata } from "../types";
 
 type CreateStaticAgentResponseInput = {
   text: string;

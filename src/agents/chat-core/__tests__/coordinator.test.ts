@@ -46,7 +46,7 @@ function createSession(role: MockAuthSession["role"]): MockAuthSession {
   };
 }
 
-function mockModel(specialist: "employee" | "manager") {
+function mockModel(specialist: "employee" | "manager" | "out_of_scope") {
   return new MockLanguageModelV3({
     doGenerate: {
       content: [{ type: "text", text: JSON.stringify({ specialist }) }],
@@ -78,6 +78,17 @@ test("denies manager intent in user mode", async () => {
   });
 
   assert.equal(decision.type, "deny");
+});
+
+test("denies out-of-scope request", async () => {
+  const decision = await routeConversation({
+    model: mockModel("out_of_scope"),
+    session: createSession("user"),
+    messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "book a room for me" }] }],
+  });
+
+  assert.equal(decision.type, "deny");
+  assert.ok(decision.message.includes("book a room for me"));
 });
 
 test("routes manager intent to manager specialist in manager mode", async () => {

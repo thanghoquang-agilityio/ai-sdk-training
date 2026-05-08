@@ -3,10 +3,14 @@ import type { MockAuthSession } from "@/lib/auth/session";
 import type {
   AgentConfig,
   AgentToolCategory,
-  PromptVersion,
   SpecialistAgentName,
 } from "./types";
-import { AGENT_CONFIG, PROMPT_VERSIONS, TOOL_FACTORIES, DESCRIPTIONS } from "./registry";
+import {
+  AGENT_CONFIG,
+  PROMPT_VERSIONS,
+  TOOL_FACTORIES,
+  DESCRIPTIONS,
+} from "./registry";
 
 /** Resolve the system prompt for an agent based on its configured version */
 export function resolveSystemPrompt(agent: SpecialistAgentName): string {
