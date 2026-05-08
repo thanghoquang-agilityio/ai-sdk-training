@@ -1,23 +1,21 @@
 import type { MockAuthSession } from "@/lib/auth/session";
+import type { AgentToolFactoryMap } from "@/agents/config/types";
 import { createEmployeeReadTools } from "./read";
 import { createEmployeeMutationTools } from "./mutation";
 
 export type EmployeeToolOptions = {
-  /** Omit collect_date_range when the latest message already contains date hints. */
   skipDatePicker?: boolean;
 };
 
-/**
- * Creates employee tools.
- * @param {MockAuthSession} session
- * @param {EmployeeToolOptions} options
- */
-export function createEmployeeTools(
-  session: MockAuthSession,
-  options?: EmployeeToolOptions,
-) {
-  return {
-    ...createEmployeeReadTools(session, options),
-    ...createEmployeeMutationTools(session),
-  };
-}
+/** Tool factories by category — consumed by the config registry */
+export const employeeToolFactories: AgentToolFactoryMap = {
+  read: (session: MockAuthSession, options?: Record<string, unknown>, model?: any) =>
+    createEmployeeReadTools(
+      session,
+      {
+        skipDatePicker: Boolean(options?.skipDatePicker),
+      },
+      model,
+    ),
+  mutation: (session: MockAuthSession) => createEmployeeMutationTools(session),
+};

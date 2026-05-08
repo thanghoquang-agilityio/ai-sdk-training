@@ -1,10 +1,11 @@
-import { tool } from "ai";
+import { tool, type LanguageModel } from "ai";
 import { z } from "zod";
 import type { MockAuthSession } from "@/lib/auth/session";
 import {
   getMyTimeOffBalance,
   listMyTimeOffRequests,
 } from "@/agents/handlers/time-off";
+import { createDateResolutionTool } from "@/agents/date/tools/read/resolution";
 import { EMPLOYEE_TOOL_DESCRIPTION, EMPLOYEE_TOOL_NAME } from "../common/definitions";
 
 const leaveTypeSchema = z
@@ -21,12 +22,16 @@ const OPTIONAL_QUERY_SCHEMA = z.string().min(1).nullish();
  * Creates employee read tools.
  * @param {MockAuthSession} session
  * @param {{ skipDatePicker?: boolean }} options
+ * @param {LanguageModel} model
  */
 export function createEmployeeReadTools(
   session: MockAuthSession,
   options?: { skipDatePicker?: boolean },
+  model?: LanguageModel,
 ) {
   const base = {
+    ...createDateResolutionTool(session, model),
+
     [EMPLOYEE_TOOL_NAME.GET_MY_TIME_OFF_BALANCE]: tool({
       description: EMPLOYEE_TOOL_DESCRIPTION.GET_MY_TIME_OFF_BALANCE,
       inputSchema: z.object({}),

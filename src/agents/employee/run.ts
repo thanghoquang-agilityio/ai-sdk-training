@@ -1,7 +1,7 @@
 import type { UIMessage } from "ai";
 import { runAgent, type AgentRunInput } from "@/agents/chat-core";
 import { buildEmployeeConversationPrompt } from "@/agents/employee/prompt/conversation";
-import { createEmployeeTools } from "@/agents/employee/tools";
+import { resolveAgentTools } from "@/agents/config";
 
 // Matches ISO dates, "Month Day" patterns, and common relative date phrases.
 const DATE_HINT_REGEX =
@@ -25,6 +25,6 @@ export async function runEmployeeAgent(input: AgentRunInput) {
     agent: "employee",
     input,
     system: buildEmployeeConversationPrompt(input.session),
-    tools: createEmployeeTools(input.session, { skipDatePicker }),
+    tools: resolveAgentTools("employee", input.session, { skipDatePicker }, input.model),
   });
 }
