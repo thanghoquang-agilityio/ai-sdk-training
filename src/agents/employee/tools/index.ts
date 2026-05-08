@@ -1,3 +1,4 @@
+import { type LanguageModel } from "ai";
 import type { MockAuthSession } from "@/lib/auth/session";
 import type { AgentToolFactoryMap } from "@/agents/config/types";
 import { createEmployeeReadTools } from "./read";
@@ -9,7 +10,7 @@ export type EmployeeToolOptions = {
 
 /** Tool factories by category — consumed by the config registry */
 export const employeeToolFactories: AgentToolFactoryMap = {
-  read: (session: MockAuthSession, options?: Record<string, unknown>, model?: any) =>
+  read: (session: MockAuthSession, options?: Record<string, unknown>, model?: LanguageModel) =>
     createEmployeeReadTools(
       session,
       {

@@ -29,6 +29,35 @@ const OPTIONAL_NOTE_SCHEMA = z.preprocess(
  */
 export function createEmployeeMutationTools(session: MockAuthSession) {
   return {
+    [EMPLOYEE_TOOL_NAME.VERIFY_MY_TIME_OFF_REQUEST]: tool({
+      description: EMPLOYEE_TOOL_DESCRIPTION.VERIFY_MY_TIME_OFF_REQUEST,
+      needsApproval: false,
+      inputSchema: z.object({
+        leaveType: leaveTypeSchema,
+        startDate: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("Start date, e.g. 2026-05-02, tomorrow, or next monday."),
+        endDate: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("End date, e.g. 2026-05-02 or next friday."),
+        reason: z.string().trim().min(1).describe("Short reason for the leave."),
+        note: OPTIONAL_NOTE_SCHEMA,
+      }),
+      execute: async ({ leaveType, startDate, endDate, reason, note }) =>
+        submitMyTimeOffRequest(session, {
+          leaveType,
+          startDate,
+          endDate,
+          reason,
+          note,
+          dryRun: true,
+        }),
+    }),
+
     [EMPLOYEE_TOOL_NAME.SUBMIT_MY_TIME_OFF_REQUEST]: tool({
       description: EMPLOYEE_TOOL_DESCRIPTION.SUBMIT_MY_TIME_OFF_REQUEST,
       needsApproval: true,
@@ -54,6 +83,7 @@ export function createEmployeeMutationTools(session: MockAuthSession) {
           endDate,
           reason,
           note,
+          dryRun: false,
         }),
     }),
 

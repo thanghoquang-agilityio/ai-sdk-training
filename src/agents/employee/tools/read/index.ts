@@ -5,12 +5,9 @@ import {
   getMyTimeOffBalance,
   listMyTimeOffRequests,
 } from "@/agents/handlers/time-off";
-import { createDateResolutionTool } from "@/agents/date/tools/read/resolution";
+import { createDateResolutionTool } from "@/agents/specialists/date/tools/read/resolution";
+import { createCollectDateRangeTool } from "@/agents/specialists/date/tools/read/collect";
 import { EMPLOYEE_TOOL_DESCRIPTION, EMPLOYEE_TOOL_NAME } from "../common/definitions";
-
-const leaveTypeSchema = z
-  .enum(["annual", "sick", "personal", "unpaid"])
-  .describe("Type of leave.");
 
 const OPTIONAL_STATUS_SCHEMA = z
   .enum(["all", "upcoming", "pending", "approved", "cancelled", "rejected"])
@@ -57,18 +54,6 @@ export function createEmployeeReadTools(
 
   return {
     ...base,
-    [EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE]: tool({
-      description: EMPLOYEE_TOOL_DESCRIPTION.COLLECT_DATE_RANGE,
-      inputSchema: z.object({
-        leaveType: leaveTypeSchema,
-        reason: z
-          .string()
-          .trim()
-          .min(1)
-          .optional()
-          .describe("Short reason for the leave, if already stated by the user."),
-      }),
-      execute: async () => ({ ok: true }),
-    }),
+    ...createCollectDateRangeTool(),
   };
 }
