@@ -1,7 +1,7 @@
 import type { LanguageModel, UIMessage } from "ai";
 import type { AppRole, MockAuthSession } from "@/lib/auth/session";
 
-export type AgentName = "coordinator" | "employee" | "manager";
+export type AgentName = "coordinator" | "employee" | "manager" | "date";
 
 export type AgentMetadata = {
   agent: AgentName;
@@ -63,5 +63,5 @@ export type AgentLogger = {
 };
 
 export type CoordinatorDecision =
-  | { type: "delegate"; specialist: "employee" | "manager" }
+  | { type: "delegate"; specialist: "employee" | "manager" | "date" }
   | { type: "deny"; message: string };

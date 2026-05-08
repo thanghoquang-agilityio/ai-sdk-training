@@ -36,6 +36,8 @@ export function getAgentMetadata(
       return { agent, agentLabel: "Manager Agent", accessRole };
     case "employee":
       return { agent, agentLabel: "Employee Agent", accessRole };
+    case "date":
+      return { agent, agentLabel: "Date Specialist", accessRole };
   }
 }
 

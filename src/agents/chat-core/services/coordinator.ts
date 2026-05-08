@@ -6,7 +6,7 @@ import type { CoordinatorDecision } from "../types";
 import { getTextParts } from "@/utils/message";
 
 const routeSchema = z.object({
-  specialist: z.enum(["employee", "manager"]),
+  specialist: z.enum(["employee", "manager", "date"]),
 });
 
 type RouteConversationInput = {

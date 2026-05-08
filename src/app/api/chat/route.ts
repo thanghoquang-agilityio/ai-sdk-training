@@ -5,6 +5,7 @@ import {
 } from "@/agents/chat-core";
 import { runManagerAgent } from "@/agents/manager/run";
 import { runEmployeeAgent } from "@/agents/employee/run";
+import { runDateAgent } from "@/agents/date/run";
 import { API_COMMON_ERROR_COPY, CHAT_API_COPY } from "@/constants/api";
 import { isAppRole } from "@/lib/auth/session";
 import { getMockAuthSession } from "@/lib/auth/session-store";
@@ -113,6 +114,15 @@ export async function POST(req: Request) {
       });
     case "employee":
       return runEmployeeAgent({
+        model: modelConfig.model,
+        modelId: modelConfig.modelId,
+        provider: modelConfig.provider,
+        messages: body.messages,
+        session,
+        onRunStats: handleAgentLogger,
+      });
+    case "date":
+      return runDateAgent({
         model: modelConfig.model,
         modelId: modelConfig.modelId,
         provider: modelConfig.provider,
