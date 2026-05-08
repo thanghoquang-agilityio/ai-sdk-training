@@ -1,6 +1,6 @@
 import { runAgent, type AgentRunInput } from "@/agents/chat-core";
 import { buildManagerConversationPrompt } from "@/agents/manager/prompt/conversation";
-import { createManagerTools } from "@/agents/manager/tools";
+import { resolveAgentTools } from "@/agents/config";
 
 /**
  * runManagerAgent helper.
@@ -11,6 +11,6 @@ export async function runManagerAgent(input: AgentRunInput) {
     agent: "manager",
     input,
     system: buildManagerConversationPrompt(input.session),
-    tools: createManagerTools(input.session),
+    tools: resolveAgentTools("manager", input.session, undefined, input.model),
   });
 }

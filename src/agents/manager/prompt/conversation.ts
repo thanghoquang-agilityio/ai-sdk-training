@@ -1,5 +1,5 @@
 import type { MockAuthSession } from "@/lib/auth/session";
-import { MANAGER_AGENT_SYSTEM_PROMPT } from "./system";
+import { resolveAgentFlow, resolveRoutingHints, resolveSystemPrompt } from "@/agents/config";
 
 /**
  * Builds manager conversation prompt.
@@ -9,11 +9,17 @@ import { MANAGER_AGENT_SYSTEM_PROMPT } from "./system";
 export function buildManagerConversationPrompt(
   session: MockAuthSession,
 ): string {
+  const systemPrompt = resolveSystemPrompt("manager");
   const managedEmployees = session.managedEmployees
     .map((e) => `- ${e.name} (${e.employeeId}, ${e.team})`)
     .join("\n");
 
-  return `${MANAGER_AGENT_SYSTEM_PROMPT}
+  return `
+${systemPrompt}
+
+${resolveAgentFlow("manager")}
+
+${resolveRoutingHints("manager")}
 
 Current manager:
 - name: ${session.name}

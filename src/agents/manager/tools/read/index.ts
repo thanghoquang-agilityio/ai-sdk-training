@@ -1,7 +1,8 @@
-import { tool } from "ai";
+import { tool, type LanguageModel } from "ai";
 import { z } from "zod";
 import type { MockAuthSession } from "@/lib/auth/session";
 import { listAllEmployees, listTeamMembers, listTeamTimeOffRequests } from "@/agents/handlers/time-off";
+import { createDateResolutionTool } from "@/agents/date/tools/read/resolution";
 import { MANAGER_TOOL_DESCRIPTION, MANAGER_TOOL_NAME } from "../common/definitions";
 
 const OPTIONAL_STATUS_SCHEMA = z
@@ -13,9 +14,12 @@ const OPTIONAL_EMPLOYEE_QUERY_SCHEMA = z.string().min(1).nullish();
 /**
  * Creates manager read tools.
  * @param {MockAuthSession} session
+ * @param {LanguageModel} model
  */
-export function createManagerReadTools(session: MockAuthSession) {
+export function createManagerReadTools(session: MockAuthSession, model?: LanguageModel) {
   return {
+    ...createDateResolutionTool(session, model),
+
     [MANAGER_TOOL_NAME.LIST_EMPLOYEES]: tool({
       description: MANAGER_TOOL_DESCRIPTION.LIST_EMPLOYEES,
       inputSchema: z.object({}),
