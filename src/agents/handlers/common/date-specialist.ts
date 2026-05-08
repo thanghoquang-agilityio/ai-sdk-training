@@ -2,7 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import type { LanguageModel } from "ai";
 import type { MockAuthSession } from "@/lib/auth/session";
-import { DATE_AGENT_SYSTEM_PROMPT_V1 } from "@/agents/date/prompt/system-v1";
+import { DATE_AGENT_SYSTEM_PROMPT_V1 } from "@/agents/specialists/date/prompt/system-v1";
 import { getTodayIsoDate } from "@/agents/handlers/common/date";
 
 const dateResolutionSchema = z.object({
