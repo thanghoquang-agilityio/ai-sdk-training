@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { API_HEADER_COPY, API_ROUTE_PATH } from "@/constants/api";
 import { PROVIDER_STORAGE_KEYS } from "@/constants/storage";
 import { PROVIDER_STATUS_COPY } from "@/constants/provider";
@@ -135,56 +135,50 @@ export function useProviderSelection({
     [normalizedOllamaBaseUrl, selectedProvider, verifiedOllamaBaseUrl, verifiedOpenAIKey],
   );
 
-  useEffect(() => {
-    sessionStorage.write(PROVIDER_STORAGE_KEYS.selectedProvider, selectedProvider);
-  }, [selectedProvider]);
+  function persistProvider(next: AIProviderName) {
+    setSelectedProvider(next);
+    sessionStorage.write(PROVIDER_STORAGE_KEYS.selectedProvider, next);
+  }
 
-  useEffect(() => {
-    sessionStorage.write(
-      PROVIDER_STORAGE_KEYS.openaiApiKeyInput,
-      openaiApiKeyInput.trim() ? openaiApiKeyInput : null,
-    );
-  }, [openaiApiKeyInput]);
+  function persistVerifiedOpenAIKey(next: string | null) {
+    setVerifiedOpenAIKey(next);
+    sessionStorage.write(PROVIDER_STORAGE_KEYS.verifiedOpenAIKey, next);
+  }
 
-  useEffect(() => {
-    sessionStorage.write(PROVIDER_STORAGE_KEYS.verifiedOpenAIKey, verifiedOpenAIKey);
-  }, [verifiedOpenAIKey]);
-
-  useEffect(() => {
-    sessionStorage.write(
-      PROVIDER_STORAGE_KEYS.ollamaBaseUrlInput,
-      ollamaBaseUrlInput.trim() ? ollamaBaseUrlInput : null,
-    );
-  }, [ollamaBaseUrlInput]);
-
-  useEffect(() => {
-    sessionStorage.write(
-      PROVIDER_STORAGE_KEYS.verifiedOllamaBaseUrl,
-      verifiedOllamaBaseUrl,
-    );
-  }, [verifiedOllamaBaseUrl]);
+  function persistVerifiedOllamaBaseUrl(next: string | null) {
+    setVerifiedOllamaBaseUrl(next);
+    sessionStorage.write(PROVIDER_STORAGE_KEYS.verifiedOllamaBaseUrl, next);
+  }
 
   function selectProvider(nextProvider: AIProviderName) {
-    setSelectedProvider(nextProvider);
+    persistProvider(nextProvider);
     setValidationError(null);
   }
 
   function updateOpenAIApiKeyInput(nextValue: string) {
     setOpenaiApiKeyInput(nextValue);
+    sessionStorage.write(
+      PROVIDER_STORAGE_KEYS.openaiApiKeyInput,
+      nextValue.trim() ? nextValue : null,
+    );
     setValidationError(null);
 
     if (verifiedOpenAIKey && verifiedOpenAIKey !== nextValue.trim()) {
-      setVerifiedOpenAIKey(null);
+      persistVerifiedOpenAIKey(null);
     }
   }
 
   function updateOllamaBaseUrlInput(nextValue: string) {
     setOllamaBaseUrlInput(nextValue);
+    sessionStorage.write(
+      PROVIDER_STORAGE_KEYS.ollamaBaseUrlInput,
+      nextValue.trim() ? nextValue : null,
+    );
     setValidationError(null);
 
     const normalized = normalizeOllamaBaseUrl(nextValue);
     if (verifiedOllamaBaseUrl && verifiedOllamaBaseUrl !== normalized) {
-      setVerifiedOllamaBaseUrl(null);
+      persistVerifiedOllamaBaseUrl(null);
     }
   }
 
@@ -208,18 +202,18 @@ export function useProviderSelection({
       const data = (await response.json()) as OpenAIKeyValidationResponse;
 
       if (response.ok && data.ok) {
-        setVerifiedOpenAIKey(key);
-        setSelectedProvider("openai");
+        persistVerifiedOpenAIKey(key);
+        persistProvider("openai");
         setSuccessMessage("OpenAI API key verified successfully.");
         return;
       }
 
-      setVerifiedOpenAIKey(null);
+      persistVerifiedOpenAIKey(null);
       setValidationError(
         data.details ?? data.message ?? PROVIDER_STATUS_COPY.openaiInvalid,
       );
     } catch (error) {
-      setVerifiedOpenAIKey(null);
+      persistVerifiedOpenAIKey(null);
       setValidationError(getErrorMessage(error));
     } finally {
       setIsValidatingKey(false);
@@ -250,10 +244,10 @@ export function useProviderSelection({
         );
       }
 
-      setVerifiedOllamaBaseUrl(data.normalizedBaseUrl ?? baseUrl);
+      persistVerifiedOllamaBaseUrl(data.normalizedBaseUrl ?? baseUrl);
       setSuccessMessage("Ollama URL verified successfully.");
     } catch (error) {
-      setVerifiedOllamaBaseUrl(null);
+      persistVerifiedOllamaBaseUrl(null);
       setValidationError(getErrorMessage(error));
     } finally {
       setIsValidatingOllamaBaseUrl(false);
