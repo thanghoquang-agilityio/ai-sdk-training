@@ -5,10 +5,7 @@ import {
 import { normalizeOllamaBaseUrl } from "@/lib/ollama-url";
 import type { OllamaUrlValidationRequestBody } from "@/types/api";
 import { getErrorMessage } from "@/utils/error";
-
-function badRequest(message: string) {
-  return Response.json({ ok: false, message }, { status: 400 });
-}
+import { badRequest } from "@/utils/http";
 
 export async function POST(req: Request) {
   let body: OllamaUrlValidationRequestBody;
@@ -16,12 +13,12 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as OllamaUrlValidationRequestBody;
   } catch {
-    return badRequest(API_COMMON_ERROR_COPY.invalidJsonBody);
+    return badRequest({ ok: false, message: API_COMMON_ERROR_COPY.invalidJsonBody });
   }
 
   const baseUrl = normalizeOllamaBaseUrl(body.baseUrl);
   if (!baseUrl) {
-    return badRequest(OLLAMA_VALIDATION_API_COPY.invalidBaseUrl);
+    return badRequest({ ok: false, message: OLLAMA_VALIDATION_API_COPY.invalidBaseUrl });
   }
 
   try {
@@ -32,9 +29,10 @@ export async function POST(req: Request) {
     });
 
     if (!response.ok) {
-      return badRequest(
-        `${OLLAMA_VALIDATION_API_COPY.tagsEndpointErrorPrefix} ${response.status}. ${OLLAMA_VALIDATION_API_COPY.tagsEndpointErrorSuffix}`,
-      );
+      return badRequest({
+        ok: false,
+        message: `${OLLAMA_VALIDATION_API_COPY.tagsEndpointErrorPrefix} ${response.status}. ${OLLAMA_VALIDATION_API_COPY.tagsEndpointErrorSuffix}`,
+      });
     }
 
     const data = (await response.json()) as {
@@ -53,8 +51,9 @@ export async function POST(req: Request) {
           : OLLAMA_VALIDATION_API_COPY.noModelsDetected,
     });
   } catch (error) {
-    return badRequest(
-      `${OLLAMA_VALIDATION_API_COPY.connectionErrorPrefix} ${getErrorMessage(error)}`,
-    );
+    return badRequest({
+      ok: false,
+      message: `${OLLAMA_VALIDATION_API_COPY.connectionErrorPrefix} ${getErrorMessage(error)}`,
+    });
   }
 }
