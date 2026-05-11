@@ -29,6 +29,7 @@ export type AgentRunPolicy = {
   messageWindow: number;
   maxRetries: number;
   maxOutputTokens?: number;
+  streamChunkDelayMs: number;
 };
 
 export type UsageInputTokenDetails = {

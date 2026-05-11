@@ -4,6 +4,7 @@ const DEFAULT_AGENT_STOP_STEP_COUNT = 6;
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
 const DEFAULT_AGENT_MESSAGE_WINDOW = 14;
 const DEFAULT_AGENT_MAX_RETRIES = 2;
+const DEFAULT_AGENT_STREAM_CHUNK_DELAY_MS = 30;
 
 /**
  * Reads finite number.
@@ -66,7 +67,13 @@ export function resolveAgentRunPolicy(): AgentRunPolicy {
     readNonNegativeInteger(process.env.AGENT_MAX_RETRIES) ??
     DEFAULT_AGENT_MAX_RETRIES;
 
-  const maxOutputTokens = readPositiveInteger(process.env.AGENT_MAX_OUTPUT_TOKENS);
+  const maxOutputTokens = readPositiveInteger(
+    process.env.AGENT_MAX_OUTPUT_TOKENS,
+  );
+
+  const streamChunkDelayMs =
+    readNonNegativeInteger(process.env.AGENT_STREAM_CHUNK_DELAY_MS) ??
+    DEFAULT_AGENT_STREAM_CHUNK_DELAY_MS;
 
   return {
     stopStepCount,
@@ -74,5 +81,6 @@ export function resolveAgentRunPolicy(): AgentRunPolicy {
     messageWindow,
     maxRetries,
     maxOutputTokens,
+    streamChunkDelayMs,
   };
 }

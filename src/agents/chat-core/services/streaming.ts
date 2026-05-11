@@ -1,5 +1,6 @@
 import {
   convertToModelMessages,
+  smoothStream,
   stepCountIs,
   streamText,
   type LanguageModel,
@@ -96,6 +97,7 @@ export async function streamAgent(input: StreamAgentInput) {
     temperature: runPolicy.temperature,
     maxRetries: runPolicy.maxRetries,
     maxOutputTokens: runPolicy.maxOutputTokens,
+    experimental_transform: smoothStream({ delayInMs: runPolicy.streamChunkDelayMs, chunking: /[\s\S]/ }),
     onFinish: ({ steps, totalUsage }) => {
       if (!input.onRunStats) return;
 
