@@ -5,7 +5,6 @@ export type ChatApiRequestBody = {
   provider?: string;
   openaiApiKey?: string;
   ollamaBaseUrl?: string;
-  authRole?: string;
 };
 
 export type OpenAIKeyValidationRequestBody = {

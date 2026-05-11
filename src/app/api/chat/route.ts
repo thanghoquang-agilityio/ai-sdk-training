@@ -6,46 +6,20 @@ import {
 import { runManagerAgent } from "@/agents/manager/run";
 import { runEmployeeAgent } from "@/agents/employee/run";
 import { API_COMMON_ERROR_COPY, CHAT_API_COPY } from "@/constants/api";
-import { isAppRole } from "@/lib/auth/session";
+import { isAppRole, type AppRole } from "@/lib/auth/session";
 import { getMockAuthSession } from "@/lib/auth/session-store";
-import {
-  type ChatModelConfig,
-  getChatModelCandidates,
-  getSupportedAIProviderList,
-  isAIProviderName,
-  type AIProviderName,
-} from "@/lib/ai-provider";
+import { AUTH_HEADER } from "@/constants/auth";
+import { type ChatModelConfig, getChatModelCandidates } from "@/lib/ai-provider";
 import { normalizeOllamaBaseUrl } from "@/lib/ollama-url";
 import type { ChatApiRequestBody } from "@/types/api";
 import { getErrorMessage } from "@/utils/error";
+import { badRequest } from "@/utils/http";
+import { parseProviderOverride } from "./utils";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
 
 const handleAgentLogger = logAgent;
-
-function badRequest(message: string) {
-  return Response.json({ error: message }, { status: 400 });
-}
-
-function parseProviderOverride(provider?: string): {
-  providerOverride?: AIProviderName;
-  errorMessage?: string;
-} {
-  const providerFromBody = provider?.trim().toLowerCase();
-
-  if (!providerFromBody) {
-    return {};
-  }
-
-  if (!isAIProviderName(providerFromBody)) {
-    return {
-      errorMessage: `${CHAT_API_COPY.invalidProviderPrefix} ${getSupportedAIProviderList()}.`,
-    };
-  }
-
-  return { providerOverride: providerFromBody };
-}
 
 export async function POST(req: Request) {
   let body: ChatApiRequestBody;
@@ -53,23 +27,23 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as ChatApiRequestBody;
   } catch {
-    return badRequest(API_COMMON_ERROR_COPY.invalidJsonBody);
+    return badRequest({ error: API_COMMON_ERROR_COPY.invalidJsonBody });
   }
 
   if (!Array.isArray(body.messages)) {
-    return badRequest(CHAT_API_COPY.invalidMessages);
+    return badRequest({ error: CHAT_API_COPY.invalidMessages });
   }
 
   const { providerOverride, errorMessage } = parseProviderOverride(
     body.provider,
   );
   if (errorMessage) {
-    return badRequest(errorMessage);
+    return badRequest({ error: errorMessage });
   }
 
-  const authRole = body.authRole?.trim().toLowerCase();
+  const rawRole = req.headers.get(AUTH_HEADER.resolvedRole) ?? "user";
   const session = await getMockAuthSession(
-    authRole && isAppRole(authRole) ? authRole : "user",
+    isAppRole(rawRole) ? (rawRole as AppRole) : "user",
   );
 
   const normalizedOllamaBaseUrl = normalizeOllamaBaseUrl(body.ollamaBaseUrl);

@@ -14,6 +14,7 @@ import {
   type FormEvent,
 } from "react";
 import { API_ROUTE_PATH } from "@/constants/api";
+import { AUTH_HEADER } from "@/constants/auth";
 import {
   APP_NAME,
   getAppEmptyHeaderHintByRole,
@@ -47,32 +48,26 @@ export function useWorkspaceApp(
     () => ({
       role: selectedRole,
       session: authSession,
-      requestBody: {
-        authRole: selectedRole,
-      },
     }),
     [authSession, selectedRole],
   );
 
-  const chatRequestBodyRef = useRef({
-    ...provider.requestBody,
-    authRole: selectedRole,
-  });
+  const chatRequestBodyRef = useRef({ ...provider.requestBody });
+  const authRoleRef = useRef(selectedRole);
   useLayoutEffect(() => {
-    chatRequestBodyRef.current = {
-      ...provider.requestBody,
-      authRole: selectedRole,
-    };
+    chatRequestBodyRef.current = { ...provider.requestBody };
+    authRoleRef.current = selectedRole;
   });
 
-  // Transport is created once. Body reads from a ref so auto-submissions
-  // (sendAutomaticallyWhen) always use the current role, not a stale closure.
+  // Transport is created once. Body and headers read from refs so auto-submissions
+  // (sendAutomaticallyWhen) always use the current values, not stale closures.
   /* eslint-disable react-hooks/refs */
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: API_ROUTE_PATH.chat,
         body: () => chatRequestBodyRef.current,
+        headers: () => ({ [AUTH_HEADER.role]: authRoleRef.current }),
       }),
     [],
   );
@@ -194,10 +189,8 @@ export function useWorkspaceApp(
       await sendMessage(
         { text: messageText },
         {
-          body: {
-            ...provider.requestBody,
-            ...auth.requestBody,
-          },
+          body: { ...provider.requestBody },
+          headers: { [AUTH_HEADER.role]: auth.role },
         },
       );
     } catch {

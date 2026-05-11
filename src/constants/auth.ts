@@ -21,3 +21,8 @@ export const SESSION_ID_BY_ROLE: Record<AppRole, string> = {
   user: "db-user-session",
   manager: "db-manager-session",
 };
+
+export const AUTH_HEADER = {
+  role: "x-auth-role",
+  resolvedRole: "x-resolved-role",
+} as const;
