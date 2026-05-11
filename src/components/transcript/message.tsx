@@ -314,7 +314,7 @@ export function ChatMessage({
   return (
     <article key={message.id} className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
       {!isUser ? <MessageAvatar initials={getAssistantInitials(message)} isUser={false} /> : null}
-      <div className={`min-w-0 ${isUser ? "max-w-[85%]" : "max-w-full flex-1"}`}>
+      <div className={isUser ? "w-fit max-w-[85%]" : "min-w-0 max-w-full flex-1"}>
         {mutationSuccessCards.length > 0 ? (
           <div className="space-y-2">{successCardContent}</div>
         ) : null}
