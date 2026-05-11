@@ -202,6 +202,9 @@ export function getToolOutputTables(part: UIMessage["parts"][number]) {
       return table ? [table] : dynamicTables;
     }
 
+    case "search_leave_policy":
+      return [];
+
     case "approve_team_time_off_request":
     case "reject_team_time_off_request": {
       const reviewedEmployeeRequests = asRecord(output.reviewedEmployeeRequests);
