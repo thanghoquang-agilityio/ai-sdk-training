@@ -22,7 +22,9 @@ export function createSearchLeavePolicyTool() {
       }),
       execute: async ({ query }) => {
         try {
-          const results = await searchPolicy(query, 3);
+          const MIN_SCORE = 0.5;
+          const allResults = await searchPolicy(query, 3);
+          const results = allResults.filter((r) => r.score >= MIN_SCORE);
           if (results.length === 0) {
             return {
               ok: false,
