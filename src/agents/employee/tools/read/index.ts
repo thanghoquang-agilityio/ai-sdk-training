@@ -7,6 +7,7 @@ import {
 } from "@/agents/handlers/time-off";
 import { createDateResolutionTool } from "@/agents/specialists/date/tools/read/resolution";
 import { createCollectDateRangeTool } from "@/agents/specialists/date/tools/read/collect";
+import { createSearchLeavePolicyTool } from "@/agents/handlers/policy/tool";
 import { EMPLOYEE_TOOL_DESCRIPTION, EMPLOYEE_TOOL_NAME } from "../common/definitions";
 
 const OPTIONAL_STATUS_SCHEMA = z
@@ -28,6 +29,7 @@ export function createEmployeeReadTools(
 ) {
   const base = {
     ...createDateResolutionTool(session, model),
+    ...createSearchLeavePolicyTool(),
 
     [EMPLOYEE_TOOL_NAME.GET_MY_TIME_OFF_BALANCE]: tool({
       description: EMPLOYEE_TOOL_DESCRIPTION.GET_MY_TIME_OFF_BALANCE,

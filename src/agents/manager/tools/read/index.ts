@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { MockAuthSession } from "@/lib/auth/session";
 import { listAllEmployees, listTeamMembers, listTeamTimeOffRequests } from "@/agents/handlers/time-off";
 import { createDateResolutionTool } from "@/agents/specialists/date/tools/read/resolution";
+import { createSearchLeavePolicyTool } from "@/agents/handlers/policy/tool";
 import { MANAGER_TOOL_DESCRIPTION, MANAGER_TOOL_NAME } from "../common/definitions";
 
 const OPTIONAL_STATUS_SCHEMA = z
@@ -19,6 +20,7 @@ const OPTIONAL_EMPLOYEE_QUERY_SCHEMA = z.string().min(1).nullish();
 export function createManagerReadTools(session: MockAuthSession, model?: LanguageModel) {
   return {
     ...createDateResolutionTool(session, model),
+    ...createSearchLeavePolicyTool(),
 
     [MANAGER_TOOL_NAME.LIST_EMPLOYEES]: tool({
       description: MANAGER_TOOL_DESCRIPTION.LIST_EMPLOYEES,

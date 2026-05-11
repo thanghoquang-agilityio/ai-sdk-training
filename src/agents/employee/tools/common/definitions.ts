@@ -1,4 +1,5 @@
 import { DATE_AGENT_TOOL_NAME, DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/specialists/date/tools/definitions";
+import { POLICY_TOOL_NAME, POLICY_TOOL_DESCRIPTION } from "@/agents/handlers/policy/definitions";
 
 export const EMPLOYEE_TOOL_NAME = {
   GET_MY_TIME_OFF_BALANCE: "get_my_time_off_balance",
@@ -8,6 +9,7 @@ export const EMPLOYEE_TOOL_NAME = {
   SUBMIT_MY_TIME_OFF_REQUEST: "submit_my_time_off_request",
   CANCEL_MY_TIME_OFF_REQUEST: "cancel_my_time_off_request",
   CONSULT_DATE_SPECIALIST: DATE_AGENT_TOOL_NAME.CONSULT_DATE_AGENT,
+  SEARCH_LEAVE_POLICY: POLICY_TOOL_NAME.SEARCH_LEAVE_POLICY,
 } as const;
 
 export const EMPLOYEE_TOOL_DESCRIPTION = {
@@ -24,4 +26,5 @@ export const EMPLOYEE_TOOL_DESCRIPTION = {
   CANCEL_MY_TIME_OFF_REQUEST:
     "Cancel one of the current user's cancellable requests. This is a sensitive mutation and should go through UI approval before execution. Use a clear request description such as latest pending request, annual leave on 2026-06-15, or family trip request.",
   CONSULT_DATE_SPECIALIST: DATE_AGENT_TOOL_DESCRIPTION[DATE_AGENT_TOOL_NAME.CONSULT_DATE_AGENT],
+  SEARCH_LEAVE_POLICY: POLICY_TOOL_DESCRIPTION[POLICY_TOOL_NAME.SEARCH_LEAVE_POLICY],
 } as const;

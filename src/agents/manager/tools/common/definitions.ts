@@ -1,4 +1,5 @@
 import { DATE_AGENT_TOOL_NAME, DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/specialists/date/tools/definitions";
+import { POLICY_TOOL_NAME, POLICY_TOOL_DESCRIPTION } from "@/agents/handlers/policy/definitions";
 
 export const MANAGER_TOOL_NAME = {
   LIST_EMPLOYEES: "list_employees",
@@ -7,6 +8,7 @@ export const MANAGER_TOOL_NAME = {
   APPROVE_TEAM_TIME_OFF_REQUEST: "approve_team_time_off_request",
   REJECT_TEAM_TIME_OFF_REQUEST: "reject_team_time_off_request",
   CONSULT_DATE_SPECIALIST: DATE_AGENT_TOOL_NAME.CONSULT_DATE_AGENT,
+  SEARCH_LEAVE_POLICY: POLICY_TOOL_NAME.SEARCH_LEAVE_POLICY,
 } as const;
 
 export const MANAGER_TOOL_DESCRIPTION = {
@@ -21,4 +23,5 @@ export const MANAGER_TOOL_DESCRIPTION = {
   REJECT_TEAM_TIME_OFF_REQUEST:
     "Reject one pending request from the current manager's team and include a short reason. This is a sensitive mutation and should go through UI approval before execution.",
   CONSULT_DATE_SPECIALIST: DATE_AGENT_TOOL_DESCRIPTION[DATE_AGENT_TOOL_NAME.CONSULT_DATE_AGENT],
+  SEARCH_LEAVE_POLICY: POLICY_TOOL_DESCRIPTION[POLICY_TOOL_NAME.SEARCH_LEAVE_POLICY],
 } as const;
