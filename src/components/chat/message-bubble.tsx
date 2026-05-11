@@ -19,7 +19,7 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   if (isUser) {
     return (
-      <div className="ml-auto max-w-[78%] rounded-[1.125rem_0.375rem_1.125rem_1.125rem] border border-violet-300/28 bg-[linear-gradient(135deg,rgba(124,58,237,0.5),rgba(79,70,229,0.44),rgba(14,165,233,0.22))] px-[0.9375rem] py-2.5 font-dm-sans text-sm leading-relaxed break-words text-white/90 shadow-[0_8px_26px_rgba(56,32,140,0.34)] backdrop-blur-lg">
+      <div className="ml-auto w-fit max-w-[78%] rounded-[1.125rem_0.375rem_1.125rem_1.125rem] border border-violet-300/28 bg-[linear-gradient(135deg,rgba(124,58,237,0.5),rgba(79,70,229,0.44),rgba(14,165,233,0.22))] px-[0.9375rem] py-2.5 font-dm-sans text-sm leading-relaxed break-words text-white/90 shadow-[0_8px_26px_rgba(56,32,140,0.34)] backdrop-blur-lg">
         <span className="whitespace-pre-wrap">{text ?? placeholder}</span>
       </div>
     );
