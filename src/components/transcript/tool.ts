@@ -111,9 +111,14 @@ export function getApprovalCardContent(part: UIMessage["parts"][number]) {
   switch (toolName) {
     case "submit_my_time_off_request": {
       const i = part.input as SubmitTimeOffInput;
+      const start = i.startDate ?? "";
+      const end = i.endDate ?? "";
+      const datePhrase = start && start === end
+        ? `on ${formatHumanDateRange(start, end)}`
+        : formatHumanDateRange(start, end);
       return {
         title: CHAT_TRANSCRIPT_COPY.toolApproval.submitRequest.title,
-        description: `${leaveTypeLabel(i.leaveType)} from ${i.startDate ?? "—"} to ${i.endDate ?? "—"}${i.reason ? `. Reason: ${i.reason}.` : "."}`,
+        description: `${leaveTypeLabel(i.leaveType)} ${datePhrase}${i.reason ? `. Reason: ${i.reason}.` : "."}`,
         confirmLabel: CHAT_TRANSCRIPT_COPY.toolApproval.submitRequest.confirmLabel,
         cancelLabel: CHAT_TRANSCRIPT_COPY.toolApproval.submitRequest.cancelLabel,
       };

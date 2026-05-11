@@ -42,6 +42,19 @@ export function formatDateWithYear(date: Date): string {
   return DATE_WITH_YEAR_FORMATTER.format(date);
 }
 
+const ISO_RANGE_MSG_REGEX = /^(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})$/;
+const ISO_SINGLE_MSG_REGEX = /^(\d{4}-\d{2}-\d{2})$/;
+
+/** Format a user message that is purely an ISO date or ISO range into a human-readable string. */
+export function formatIsoDateMessage(text: string): string {
+  const t = text.trim();
+  const range = ISO_RANGE_MSG_REGEX.exec(t);
+  if (range) return formatHumanDateRange(range[1], range[2]);
+  const single = ISO_SINGLE_MSG_REGEX.exec(t);
+  if (single) return formatHumanDateRange(single[1], single[1]);
+  return text;
+}
+
 export function formatHumanDateRange(startDate: string, endDate: string): string {
   if (!startDate && !endDate) return "—";
 

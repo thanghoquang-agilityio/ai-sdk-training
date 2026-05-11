@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getAvatarUrl, getInitialsFromName } from "@/utils/avatar";
 import { getTextParts } from "@/utils/message";
+import { formatIsoDateMessage } from "@/utils/date";
 import {
   getToolParts,
   getToolStepText,
@@ -245,6 +246,7 @@ export function ChatMessage({
       ? splitTextBeforeAndAfterTables(normalizedText)
       : { beforeTables: normalizedText, afterTables: null };
   const text = textPlacement.beforeTables;
+  const displayText = isUser ? formatIsoDateMessage(text) : text;
   // While the tool is still in-flight and no text has streamed yet, keep the skeleton visible.
   // Once loading ends (or text arrives), reveal the card.
   const shouldDeferSuccessCards = !isUser && isLastMessage && isLoading && text.length === 0;
@@ -280,7 +282,7 @@ export function ChatMessage({
 
   const secondContentProps: SecondContentProps = {
     message, isUser, isLoading, isLastMessage, shouldRenderBubble, embedOutputTablesInBubble,
-    text, visibleOutputTables, tableIds, useTableLeadInLayout, textPlacement,
+    text: displayText, visibleOutputTables, tableIds, useTableLeadInLayout, textPlacement,
     shouldShowThinkingSkeleton, thinkingLabel, approvalParts, datePickerParts,
     statusParts, onSelectPrompt, onToolApproval,
   };
