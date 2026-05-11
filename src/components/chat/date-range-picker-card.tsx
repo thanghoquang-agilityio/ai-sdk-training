@@ -403,7 +403,7 @@ export function DateRangePickerCard({
       if (rangeStartSlot !== "all_day") {
         onSubmit(`${rangeStartSlot} of ${startDate}`);
       } else {
-        onSubmit(`${startDate} to ${startDate}`);
+        onSubmit(startDate);
       }
       return;
     }
