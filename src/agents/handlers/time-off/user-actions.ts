@@ -91,7 +91,7 @@ export async function submitMyTimeOffRequest(
     return {
       ok: false,
       code: "PAST_DATE",
-      message: `New time-off requests must start on or after ${getTodayIsoDate(employee.timeZone)}.`,
+      message: `The dates you provided (${input.startDate} to ${input.endDate}) are in the past and are not valid for a new time-off request. Today is ${getTodayIsoDate(employee.timeZone)}. Please select new dates.`,
     };
   }
 
