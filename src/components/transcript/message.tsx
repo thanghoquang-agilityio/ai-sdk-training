@@ -39,6 +39,7 @@ type SecondContentProps = {
   message: UIMessage;
   isUser: boolean;
   isLoading: boolean;
+  isLastMessage: boolean;
   shouldRenderBubble: boolean;
   embedOutputTablesInBubble: boolean;
   text: string;
@@ -56,11 +57,12 @@ type SecondContentProps = {
 };
 
 function MessageSecondContent({
-  message, isUser, isLoading, shouldRenderBubble, embedOutputTablesInBubble,
+  message, isUser, isLoading, isLastMessage, shouldRenderBubble, embedOutputTablesInBubble,
   text, visibleOutputTables, tableIds, useTableLeadInLayout, textPlacement,
   shouldShowThinkingSkeleton, thinkingLabel, approvalParts, datePickerParts,
   statusParts, onSelectPrompt, onToolApproval,
 }: SecondContentProps) {
+  const actionsDisabled = isLoading || !isLastMessage;
   return (
     <>
       {shouldRenderBubble ? (
@@ -76,7 +78,7 @@ function MessageSecondContent({
                   ) : null}
                   <ToolOutputTable title={table.title} columns={table.columns} rows={table.rows}
                     rowActions={table.rowActions} rowActionSummaries={table.rowActionSummaries}
-                    onActionClick={onSelectPrompt} disableActions={isLoading} emptyLabel={table.emptyLabel}
+                    onActionClick={onSelectPrompt} disableActions={actionsDisabled} emptyLabel={table.emptyLabel}
                   />
                 </div>
               ))}
@@ -124,7 +126,7 @@ function MessageSecondContent({
           {visibleOutputTables.map((table) => (
             <ToolOutputTable key={table.key} title={table.title} columns={table.columns}
               rows={table.rows} rowActions={table.rowActions} rowActionSummaries={table.rowActionSummaries}
-              onActionClick={onSelectPrompt} disableActions={isLoading} emptyLabel={table.emptyLabel}
+              onActionClick={onSelectPrompt} disableActions={actionsDisabled} emptyLabel={table.emptyLabel}
             />
           ))}
         </div>
@@ -243,15 +245,20 @@ export function ChatMessage({
       ? splitTextBeforeAndAfterTables(normalizedText)
       : { beforeTables: normalizedText, afterTables: null };
   const text = textPlacement.beforeTables;
+  // While the tool is still in-flight and no text has streamed yet, keep the skeleton visible.
+  // Once loading ends (or text arrives), reveal the card.
+  const shouldDeferSuccessCards = !isUser && isLastMessage && isLoading && text.length === 0;
+  const mutationSuccessCards = shouldDeferSuccessCards
+    ? []
+    : toolParts
+        .map((part, partIndex) => {
+          const success = getMutationSuccessCard(part);
+          if (!success) return null;
+          return { ...success, key: `${message.id}-success-${part.toolCallId ?? partIndex}` } as MutationSuccessCard;
+        })
+        .filter((item): item is MutationSuccessCard => item !== null);
   const shouldShowThinkingSkeleton =
     !isUser && isLastMessage && isLoading && text.length === 0 && approvalParts.length === 0;
-  const mutationSuccessCards = toolParts
-    .map((part, partIndex) => {
-      const success = getMutationSuccessCard(part);
-      if (!success) return null;
-      return { ...success, key: `${message.id}-success-${part.toolCallId ?? partIndex}` } as MutationSuccessCard;
-    })
-    .filter((item): item is MutationSuccessCard => item !== null);
   const statusParts = toolParts
     .map((part) => getToolStatusCopy(part))
     .filter((item) => item !== null);
@@ -272,7 +279,7 @@ export function ChatMessage({
     statusParts.length > 0;
 
   const secondContentProps: SecondContentProps = {
-    message, isUser, isLoading, shouldRenderBubble, embedOutputTablesInBubble,
+    message, isUser, isLoading, isLastMessage, shouldRenderBubble, embedOutputTablesInBubble,
     text, visibleOutputTables, tableIds, useTableLeadInLayout, textPlacement,
     shouldShowThinkingSkeleton, thinkingLabel, approvalParts, datePickerParts,
     statusParts, onSelectPrompt, onToolApproval,

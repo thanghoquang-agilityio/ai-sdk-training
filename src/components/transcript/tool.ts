@@ -165,12 +165,13 @@ export function getToolStatusCopy(part: UIMessage["parts"][number]) {
 
   switch (part.state) {
     case "approval-responded":
-      return {
-        tone: "neutral" as const,
-        text: part.approval.approved
-          ? `${shortLabel} ${CHAT_TRANSCRIPT_COPY.toolStatus.confirmedSuffix}`
-          : `${shortLabel} ${CHAT_TRANSCRIPT_COPY.toolStatus.cancelledSuffix}`,
-      };
+      if (!part.approval.approved) {
+        return {
+          tone: "neutral" as const,
+          text: `${shortLabel} ${CHAT_TRANSCRIPT_COPY.toolStatus.cancelledSuffix}`,
+        };
+      }
+      return null;
     case "output-error":
       // Never surface raw errorText (may contain Zod/JSON validation details).
       // The agent's text response already explains what went wrong to the user.
@@ -201,7 +202,7 @@ export type MutationSuccessCard = {
 };
 
 export function getMutationSuccessCard(part: UIMessage["parts"][number]) {
-  if (!isToolUIPart(part) || part.state !== "output-available" || part.preliminary) {
+  if (!isToolUIPart(part) || part.state !== "output-available") {
     return null;
   }
 
