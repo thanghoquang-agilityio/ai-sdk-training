@@ -16,6 +16,7 @@ type ChatComposerProps = {
   canSend: boolean;
   isLoading: boolean;
   isProviderReady: boolean;
+  pendingApproval?: boolean;
   inputTooltip?: string;
   helperText?: string;
   errorMessage?: string | null;
@@ -28,6 +29,7 @@ export function ChatComposer({
   canSend,
   isLoading,
   isProviderReady,
+  pendingApproval = false,
   inputTooltip,
   helperText,
   errorMessage,
@@ -36,6 +38,10 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showTooltip, setShowTooltip] = useState(false);
+  const isInputBlocked = !isProviderReady || pendingApproval;
+  const activeTooltip = pendingApproval
+    ? CHAT_COMPOSER_COPY.pendingApprovalTooltip
+    : inputTooltip;
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -68,13 +74,13 @@ export function ChatComposer({
 
         <div
           className="relative"
-          onMouseEnter={() => !isProviderReady && setShowTooltip(true)}
+          onMouseEnter={() => isInputBlocked && setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
-          onClick={() => !isProviderReady && setShowTooltip(true)}
+          onClick={() => isInputBlocked && setShowTooltip(true)}
         >
-          {showTooltip && !isProviderReady && inputTooltip && (
-            <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-1.5 font-dm-sans text-xs text-white shadow-lg">
-              {inputTooltip}
+          {showTooltip && isInputBlocked && activeTooltip && (
+            <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 max-w-xs rounded-lg bg-slate-800 px-3 py-1.5 font-dm-sans text-xs text-white shadow-lg text-center">
+              {activeTooltip}
               <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
             </div>
           )}
@@ -87,16 +93,16 @@ export function ChatComposer({
             value={input}
             onChange={(event) => onInputChange(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={CHAT_COMPOSER_COPY.placeholder}
+            placeholder={pendingApproval ? CHAT_COMPOSER_COPY.pendingApprovalPlaceholder : CHAT_COMPOSER_COPY.placeholder}
             aria-label={CHAT_COMPOSER_COPY.ariaLabel}
-            disabled={!isProviderReady}
+            disabled={isInputBlocked}
             rows={1}
             className="max-h-[9.375rem] flex-1 resize-none overflow-y-auto border-none bg-transparent font-dm-sans text-sm leading-[1.55] text-white/90 caret-violet-400/90 outline-none placeholder:text-white/46 disabled:cursor-not-allowed disabled:opacity-50"
           />
 
           <button
             type="submit"
-            disabled={!canSend}
+            disabled={!canSend || pendingApproval}
             aria-label={CHAT_COMPOSER_COPY.sendButtonLabel}
             className={cn(
               "self-end grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-all duration-200",

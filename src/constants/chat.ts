@@ -11,6 +11,8 @@ export const CHAT_COMPOSER_COPY = {
   thinkingButtonLabel: "Thinking...",
   verifyFirstButtonLabel: "Verify first",
   verifyProviderTooltip: "Please verify your OpenAI key first.",
+  pendingApprovalTooltip: "Please confirm or cancel the action above before sending a new message.",
+  pendingApprovalPlaceholder: "Respond to the confirmation card above…",
 } as const;
 
 export const CHAT_THREAD_COPY = {

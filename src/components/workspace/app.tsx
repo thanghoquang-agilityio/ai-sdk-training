@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { isToolUIPart } from "ai";
 import { ProviderSelector } from "@/components/chat/provider-selector";
 import { ChatComposer } from "@/components/chat/composer";
 import { ChatTranscript } from "@/components/transcript";
@@ -78,6 +79,14 @@ function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
     handleToolApproval,
     handleRoleChange,
   } = useWorkspaceApp(authRole ?? "user", authSessions);
+
+  const lastMessage = messages[messages.length - 1];
+  const hasPendingApproval =
+    !isLoading &&
+    lastMessage?.role === "assistant" &&
+    lastMessage.parts.some(
+      (part) => isToolUIPart(part) && part.state === "approval-requested",
+    );
 
   const accountPanel = (
     <AuthPanel
@@ -179,6 +188,7 @@ function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
             canSend={canSend}
             isLoading={isLoading}
             isProviderReady={provider.isProviderReady}
+            pendingApproval={hasPendingApproval}
             inputTooltip={
               !provider.isProviderReady
                 ? CHAT_COMPOSER_COPY.verifyProviderTooltip
