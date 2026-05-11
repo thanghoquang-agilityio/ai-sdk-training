@@ -1,20 +1,8 @@
 "use client";
 
-import {
-  DefaultChatTransport,
-  isToolUIPart,
-} from "ai";
-import { useChat } from "@ai-sdk/react";
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
-import { API_ROUTE_PATH } from "@/constants/api";
-import { AUTH_HEADER } from "@/constants/auth";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useAgent, useAgentContext } from "@copilotkit/react-core/v2";
+import type { Message } from "@ag-ui/core";
 import {
   APP_NAME,
   getAppEmptyHeaderHintByRole,
@@ -29,90 +17,54 @@ import {
 import { PROVIDER_HELPER_HINT_COPY } from "@/constants/provider";
 import { useChatAutoScroll } from "@/hooks/use-auto-scroll";
 import { useChatThreads } from "@/hooks/use-threads";
-import { useProviderSelection } from "@/hooks/use-provider";
+import type { UseProviderSelectionResult } from "@/types/provider";
 import type { AppRole, MockAuthSession } from "@/lib/auth/session";
-import { getDisplayErrorMessage } from "@/utils/error";
+import { agUIMessagesToUIMessages } from "@/utils/message-adapter";
+import type { LeaveAssistantState } from "@/agents/chat-core/services/ag-ui-types";
 
 export function useWorkspaceApp(
-  authRole: AppRole,
   authSessions: Record<AppRole, MockAuthSession>,
+  selectedRole: AppRole,
+  setSelectedRole: (role: AppRole) => void,
+  provider: UseProviderSelectionResult,
 ) {
   const [input, setInput] = useState("");
-  const [selectedRole, setSelectedRole] = useState<AppRole>(authRole ?? "user");
-  const autoSubmittedApprovalIdsRef = useRef<Set<string>>(new Set());
-  const provider = useProviderSelection({
-    requireOpenAIApiKeyVerification: true,
-  });
+
   const authSession = authSessions[selectedRole] ?? authSessions.user;
   const auth = useMemo(
-    () => ({
-      role: selectedRole,
-      session: authSession,
-    }),
+    () => ({ role: selectedRole, session: authSession }),
     [authSession, selectedRole],
   );
 
-  const chatRequestBodyRef = useRef({ ...provider.requestBody });
-  const authRoleRef = useRef(selectedRole);
-  useLayoutEffect(() => {
-    chatRequestBodyRef.current = { ...provider.requestBody };
-    authRoleRef.current = selectedRole;
-  });
-
-  // Transport is created once. Body and headers read from refs so auto-submissions
-  // (sendAutomaticallyWhen) always use the current values, not stale closures.
-  /* eslint-disable react-hooks/refs */
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: API_ROUTE_PATH.chat,
-        body: () => chatRequestBodyRef.current,
-        headers: () => ({ [AUTH_HEADER.role]: authRoleRef.current }),
-      }),
-    [],
-  );
-  /* eslint-enable react-hooks/refs */
-
-  const {
-    messages,
-    setMessages,
-    sendMessage,
-    addToolApprovalResponse,
-    status,
-    error,
-    clearError,
-  } = useChat({
-    transport,
-    sendAutomaticallyWhen: ({ messages }) => {
-      const lastMessage = messages.at(-1);
-
-      if (!lastMessage || lastMessage.role !== "assistant") {
-        return false;
-      }
-
-      const approvalResponses = lastMessage.parts
-        .filter((part) => isToolUIPart(part) && part.state === "approval-responded")
-        .map((part) => part.approval.id);
-
-      if (approvalResponses.length === 0) {
-        return false;
-      }
-
-      const hasNewApprovalResponse = approvalResponses.some(
-        (id) => !autoSubmittedApprovalIdsRef.current.has(id),
-      );
-
-      if (!hasNewApprovalResponse) {
-        return false;
-      }
-
-      approvalResponses.forEach((id) => {
-        autoSubmittedApprovalIdsRef.current.add(id);
-      });
-
-      return true;
+  useAgentContext({
+    description: "Leave assistant configuration: provider type, API key, Ollama URL, and current user auth role",
+    value: {
+      provider: provider.requestBody.provider,
+      openaiApiKey: provider.requestBody.openaiApiKey ?? null,
+      ollamaBaseUrl: provider.requestBody.ollamaBaseUrl ?? null,
+      authRole: selectedRole,
     },
   });
+
+  const { agent } = useAgent({ agentId: "leaveAssistant" });
+
+  const agentMessages = agent.messages as Message[];
+  const isLoading = agent.isRunning;
+  const agentState = agent.state as LeaveAssistantState | undefined;
+  const showDatePicker = agentState?.phase === "awaiting_dates" && !isLoading;
+  const collectDateRangeLeaveType = agentState?.collectDateRangeLeaveType;
+
+  const messages = useMemo(
+    () => agUIMessagesToUIMessages(agentMessages),
+    [agentMessages],
+  );
+
+  const setAgentMessages = useMemo(
+    () => (msgs: Message[]) => agent.setMessages(msgs),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [agent],
+  );
+
   const {
     activeThread,
     allThreads,
@@ -120,55 +72,28 @@ export function useWorkspaceApp(
     createNewThread,
     deleteThread,
   } = useChatThreads({
-    messages,
-    setMessages,
-    provider: provider.selectedProvider,
+    messages: agentMessages,
+    setMessages: setAgentMessages,
+    provider: provider.requestBody.provider,
     role: auth.role,
   });
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  const isSubmitting = status === "submitted";
-  const isStreaming = status === "streaming";
-  const isLoading = isSubmitting || isStreaming;
   const trimmedInput = input.trim();
-  const canSend =
-    trimmedInput.length > 0 && !isLoading && provider.isProviderReady;
-  const requestError = error ? getDisplayErrorMessage(error) : null;
+  const canSend = trimmedInput.length > 0 && !isLoading && provider.isProviderReady;
   const isEmptyConversation = messages.length === 0;
-  const quickActions = useMemo(
-    () => getQuickActionsByRole(auth.role),
-    [auth.role],
-  );
+  const quickActions = useMemo(() => getQuickActionsByRole(auth.role), [auth.role]);
+
   const headerTitle = isEmptyConversation
     ? getAppEmptyHeaderTitleByRole(auth.role)
     : (activeThread?.title ?? APP_NAME);
   const headerSubtitle = isEmptyConversation
     ? getAppSubtitleByRole(auth.role)
     : (activeThread?.preview ?? getAppSubtitleByRole(auth.role));
-  const headerHint = isEmptyConversation
-    ? getAppEmptyHeaderHintByRole(auth.role)
-    : null;
+  const headerHint = isEmptyConversation ? getAppEmptyHeaderHintByRole(auth.role) : null;
 
-  useChatAutoScroll(messagesContainerRef, messages, isStreaming);
-
-  useEffect(() => {
-    if (!provider.validationError || requestError) {
-      return;
-    }
-
-    clearError();
-  }, [clearError, provider.validationError, requestError]);
-
-  const previousRoleRef = useRef(auth.role);
-
-  useEffect(() => {
-    if (previousRoleRef.current === auth.role) {
-      return;
-    }
-
-    previousRoleRef.current = auth.role;
-    clearError();
-  }, [auth.role, clearError]);
+  useChatAutoScroll(messagesContainerRef, messages, isLoading);
 
   async function submitTextMessage(
     text: string,
@@ -183,16 +108,14 @@ export function useWorkspaceApp(
     }
 
     setInput("");
-    clearError();
 
     try {
-      await sendMessage(
-        { text: messageText },
-        {
-          body: { ...provider.requestBody },
-          headers: { [AUTH_HEADER.role]: auth.role },
-        },
-      );
+      const userMsg: Message = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: messageText,
+      };
+      agent.addMessage(userMsg);
     } catch {
       if (options?.restoreInputOnError ?? false) {
         setInput(messageText);
@@ -209,25 +132,15 @@ export function useWorkspaceApp(
     await submitTextMessage(prompt, { restoreInputOnError: true });
   }
 
-  function handleToolApproval(id: string, approved: boolean) {
-    clearError();
-    void addToolApprovalResponse({ id, approved });
-  }
-
   function handleRoleChange(role: AppRole) {
-    if (role === selectedRole) {
-      return;
-    }
-
-    clearError();
+    if (role === selectedRole) return;
     setInput("");
-    setMessages([]);
-    autoSubmittedApprovalIdsRef.current.clear();
+    agent.setMessages([]);
     setSelectedRole(role);
   }
 
   const helperText = useMemo(() => {
-    if (isSubmitting) return CHAT_COMPOSER_COPY.submitHint;
+    if (isLoading) return CHAT_COMPOSER_COPY.submitHint;
     if (provider.isOpenAISelected && !provider.isOpenAIReady) {
       return PROVIDER_HELPER_HINT_COPY.verifyOpenAIFirst;
     }
@@ -237,7 +150,7 @@ export function useWorkspaceApp(
     return CHAT_HELPER_COPY_BY_ROLE[auth.role];
   }, [
     auth.role,
-    isSubmitting,
+    isLoading,
     provider.isOpenAIReady,
     provider.isOpenAISelected,
     provider.isProviderReady,
@@ -247,11 +160,12 @@ export function useWorkspaceApp(
     input,
     setInput,
     auth,
-    provider,
     messages,
     isLoading,
+    agentState,
+    showDatePicker,
+    collectDateRangeLeaveType,
     canSend,
-    requestError,
     isEmptyConversation,
     quickActions,
     headerTitle,
@@ -267,7 +181,6 @@ export function useWorkspaceApp(
     submitTextMessage,
     handleSubmit,
     handlePromptSelect,
-    handleToolApproval,
     handleRoleChange,
   };
 }

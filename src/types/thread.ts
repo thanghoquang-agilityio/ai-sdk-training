@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai";
+import type { Message } from "@ag-ui/core";
 import type { AIProviderName } from "@/lib/ai-provider";
 
 export type ChatThread = {
@@ -8,9 +8,7 @@ export type ChatThread = {
   createdAt: string;
   updatedAt: string;
   provider: AIProviderName;
-  messages: UIMessage[];
+  messages: Message[];
 };
 
-export type SetChatMessages = (
-  messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[]),
-) => void;
+export type SetChatMessages = (messages: Message[]) => void;

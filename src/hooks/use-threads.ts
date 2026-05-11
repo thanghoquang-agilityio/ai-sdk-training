@@ -1,6 +1,6 @@
 "use client";
 
-import type { UIMessage } from "ai";
+import type { Message } from "@ag-ui/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CHAT_THREAD_COPY } from "@/constants/chat";
 import { CHAT_STORAGE_KEYS } from "@/constants/storage";
@@ -8,7 +8,6 @@ import type { AIProviderName } from "@/lib/ai-provider";
 import type { AppRole } from "@/lib/auth/session";
 import type { ChatThread, SetChatMessages } from "@/types/thread";
 import { local } from "@/utils/storage";
-import { getTextParts } from "@/utils/message";
 
 export type { ChatThread } from "@/types/thread";
 
@@ -30,25 +29,28 @@ function truncate(text: string, maxLength: number) {
   return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }
 
-function deriveTitle(messages: UIMessage[]) {
-  const firstUserText = messages.find((m) => m.role === "user");
-  const text = firstUserText ? getTextParts(firstUserText).join(" ").trim() : "";
+function deriveTitle(messages: Message[]) {
+  const firstUser = messages.find((m) => m.role === "user");
+  const text =
+    firstUser && typeof (firstUser as { content?: unknown }).content === "string"
+      ? ((firstUser as { content: string }).content.trim())
+      : "";
   return text
     ? truncate(text, CHAT_THREAD_COPY.titleMaxLength)
     : CHAT_THREAD_COPY.defaultTitle;
 }
 
-function derivePreview(messages: UIMessage[]) {
-  const lastMessage = [...messages].reverse().find((m) => {
-    const text = getTextParts(m).join(" ").trim();
-    return text.length > 0;
-  });
-
-  if (!lastMessage) return CHAT_THREAD_COPY.emptyPreview;
-  return truncate(
-    getTextParts(lastMessage).join(" ").trim(),
-    CHAT_THREAD_COPY.previewMaxLength,
-  );
+function derivePreview(messages: Message[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === "user" || msg.role === "assistant") {
+      const content = (msg as { content?: unknown }).content;
+      if (typeof content === "string" && content.trim()) {
+        return truncate(content.trim(), CHAT_THREAD_COPY.previewMaxLength);
+      }
+    }
+  }
+  return CHAT_THREAD_COPY.emptyPreview;
 }
 
 function createEmptyThread(provider: AIProviderName): ChatThread {
@@ -104,9 +106,9 @@ function parseStoredData(raw: string | null, provider: AIProviderName): StoredDa
       }
       const validThreads = data.threads.filter(isChatThread);
       if (validThreads.length === 0) return defaultData();
-      
-      const activeId = validThreads.some(t => t.id === data.activeId) 
-        ? data.activeId 
+
+      const activeId = validThreads.some((t) => t.id === data.activeId)
+        ? data.activeId
         : validThreads[0].id;
 
       return { threads: validThreads, activeId };
@@ -135,7 +137,7 @@ export function useChatThreads({
   provider,
   role,
 }: {
-  messages: UIMessage[];
+  messages: Message[];
   setMessages: SetChatMessages;
   provider: AIProviderName;
   role: AppRole;
@@ -143,11 +145,11 @@ export function useChatThreads({
   const [data, setData] = useState<StoredData>(() =>
     parseStoredData(local.read(CHAT_STORAGE_KEYS.threadsByRole), provider),
   );
-  
+
   const previousRoleRef = useRef(role);
   const isInternalChangeRef = useRef(false);
 
-  // Sync messages from useChat to the active thread in state
+  // Sync messages from agent to the active thread in state
   useEffect(() => {
     if (isInternalChangeRef.current) return;
 
@@ -167,8 +169,10 @@ export function useChatThreads({
         provider,
       };
 
-      // Only update if something meaningful changed to avoid loops
-      if (JSON.stringify(activeThread.messages) === JSON.stringify(messages) && activeThread.provider === provider) {
+      if (
+        JSON.stringify(activeThread.messages) === JSON.stringify(messages) &&
+        activeThread.provider === provider
+      ) {
         return prev;
       }
 
@@ -188,14 +192,12 @@ export function useChatThreads({
 
     previousRoleRef.current = role;
 
-    // Load messages for the new role's active thread
     const nextRoleData = data[role];
     const nextActiveThread = nextRoleData.threads.find((t) => t.id === nextRoleData.activeId);
-    
+
     if (nextActiveThread) {
       isInternalChangeRef.current = true;
       setMessages(nextActiveThread.messages);
-      // Reset ref after a tick to allow messages state to stabilize
       setTimeout(() => {
         isInternalChangeRef.current = false;
       }, 0);
@@ -241,7 +243,7 @@ export function useChatThreads({
         activeId: newThread.id,
       },
     }));
-    
+
     isInternalChangeRef.current = true;
     setMessages([]);
     setTimeout(() => {
@@ -253,12 +255,12 @@ export function useChatThreads({
     setData((prev) => {
       const roleData = prev[role];
       const nextThreads = roleData.threads.filter((t) => t.id !== id);
-      
+
       if (nextThreads.length === 0) {
         const empty = createEmptyThread(provider);
         return {
           ...prev,
-          [role]: { threads: [empty], activeId: empty.id }
+          [role]: { threads: [empty], activeId: empty.id },
         };
       }
 
@@ -269,16 +271,15 @@ export function useChatThreads({
 
       return {
         ...prev,
-        [role]: { threads: nextThreads, activeId: nextActiveId }
+        [role]: { threads: nextThreads, activeId: nextActiveId },
       };
     });
 
-    // If we deleted the active thread, we need to update messages
     if (id === data[role].activeId) {
       const roleData = data[role];
       const nextThreads = roleData.threads.filter((t) => t.id !== id);
       const nextActiveThread = nextThreads.length > 0 ? nextThreads[0] : null;
-      
+
       isInternalChangeRef.current = true;
       setMessages(nextActiveThread ? nextActiveThread.messages : []);
       setTimeout(() => {
@@ -287,22 +288,11 @@ export function useChatThreads({
     }
   }
 
-  function clearThread() {
-    // This now effectively means "delete all threads for this role and start fresh"
-    const empty = createEmptyThread(provider);
-    setData((prev) => ({
-      ...prev,
-      [role]: { threads: [empty], activeId: empty.id }
-    }));
-    setMessages([]);
-  }
-
-  return { 
-    activeThread, 
-    allThreads, 
-    switchThread, 
-    createNewThread, 
-    deleteThread, 
-    clearThread 
+  return {
+    activeThread,
+    allThreads,
+    switchThread,
+    createNewThread,
+    deleteThread,
   };
 }

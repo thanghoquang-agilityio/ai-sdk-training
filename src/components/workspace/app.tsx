@@ -1,9 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { isToolUIPart } from "ai";
+import { useSyncExternalStore, useState } from "react";
+import { CopilotKit } from "@copilotkit/react-core";
 import { ProviderSelector } from "@/components/chat/provider-selector";
 import { ChatComposer } from "@/components/chat/composer";
+import { DateRangePickerCard } from "@/components/chat/date-range-picker-card";
 import { ChatTranscript } from "@/components/transcript";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import { isProductionLike } from "@/lib/runtime-env";
 import type { AIProviderName } from "@/lib/ai-provider";
 import { Text } from "@/components/ui/text";
 import { getInitialsFromName } from "@/utils/avatar";
+import { useProviderSelection } from "@/hooks/use-provider";
 import { useWorkspaceApp } from "@/hooks/use-workspace-app";
 
 const ALLOWED_PROVIDERS: AIProviderName[] = isProductionLike()
@@ -54,15 +56,49 @@ export function WorkspaceApp({
 }
 
 function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
+  const [selectedRole, setSelectedRole] = useState<AppRole>(authRole ?? "user");
+  const provider = useProviderSelection({ requireOpenAIApiKeyVerification: true });
+
+  return (
+    <CopilotKit runtimeUrl="/api/copilotkit" agent="leaveAssistant">
+      {provider.successMessage ? (
+        <Toast
+          message={provider.successMessage}
+          variant="success"
+          onDismiss={provider.dismissSuccessMessage}
+        />
+      ) : null}
+      <WorkspaceContent
+        authSessions={authSessions}
+        selectedRole={selectedRole}
+        setSelectedRole={setSelectedRole}
+        provider={provider}
+      />
+    </CopilotKit>
+  );
+}
+
+type WorkspaceContentProps = {
+  authSessions: Record<AppRole, MockAuthSession>;
+  selectedRole: AppRole;
+  setSelectedRole: (role: AppRole) => void;
+  provider: ReturnType<typeof useProviderSelection>;
+};
+
+function WorkspaceContent({
+  authSessions,
+  selectedRole,
+  setSelectedRole,
+  provider,
+}: WorkspaceContentProps) {
   const {
     input,
     setInput,
     auth,
-    provider,
     messages,
     isLoading,
+    showDatePicker,
     canSend,
-    requestError,
     quickActions,
     headerTitle,
     headerSubtitle,
@@ -76,17 +112,8 @@ function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
     deleteThread,
     handleSubmit,
     handlePromptSelect,
-    handleToolApproval,
     handleRoleChange,
-  } = useWorkspaceApp(authRole ?? "user", authSessions);
-
-  const lastMessage = messages[messages.length - 1];
-  const hasPendingApproval =
-    !isLoading &&
-    lastMessage?.role === "assistant" &&
-    lastMessage.parts.some(
-      (part) => isToolUIPart(part) && part.state === "approval-requested",
-    );
+  } = useWorkspaceApp(authSessions, selectedRole, setSelectedRole, provider);
 
   const accountPanel = (
     <AuthPanel
@@ -115,15 +142,12 @@ function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
     </Card>
   );
 
+  const datePicker = showDatePicker ? (
+    <DateRangePickerCard disabled={isLoading} onSubmit={handlePromptSelect} />
+  ) : null;
+
   return (
     <main className="min-h-screen min-h-dvh px-3 py-3 sm:px-5 sm:py-5">
-      {provider.successMessage ? (
-        <Toast
-          message={provider.successMessage}
-          variant="success"
-          onDismiss={provider.dismissSuccessMessage}
-        />
-      ) : null}
       <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] min-h-[calc(100dvh-1.5rem)] w-full max-w-[1600px] flex-col gap-3 sm:min-h-[calc(100vh-2.5rem)] sm:min-h-[calc(100dvh-2.5rem)] sm:gap-4 lg:flex-row">
         <ThreadSidebar
           activeThread={activeThread}
@@ -180,7 +204,7 @@ function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
             userInitials={getInitialsFromName(auth.session.name)}
             quickActions={quickActions}
             onSelectPrompt={handlePromptSelect}
-            onToolApproval={handleToolApproval}
+            datePicker={datePicker}
           />
 
           <ChatComposer
@@ -188,14 +212,14 @@ function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
             canSend={canSend}
             isLoading={isLoading}
             isProviderReady={provider.isProviderReady}
-            pendingApproval={hasPendingApproval}
+            pendingApproval={false}
             inputTooltip={
               !provider.isProviderReady
                 ? CHAT_COMPOSER_COPY.verifyProviderTooltip
                 : undefined
             }
             helperText={helperText}
-            errorMessage={requestError}
+            errorMessage={null}
             onInputChange={setInput}
             onSubmitAction={handleSubmit}
           />
