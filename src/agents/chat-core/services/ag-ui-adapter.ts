@@ -1,22 +1,11 @@
 import { AbstractAgent } from "@ag-ui/client";
 import { EventType, type BaseEvent, type RunAgentInput, type Message } from "@ag-ui/core";
 import { Observable } from "rxjs";
-import {
-  convertToModelMessages,
-  stepCountIs,
-  streamText,
-  type UIMessage,
-  type ToolSet,
-} from "ai";
-import {
-  buildConversationRuntimeContext,
-  buildRuntimeSystemPrompt,
-} from "../prompt/builder";
-import { resolveAgentRunPolicy } from "../observers/policy";
+import { type UIMessage } from "ai";
 import { routeConversation } from "./coordinator";
-import { buildManagerConversationPrompt } from "@/agents/manager/prompt/conversation";
-import { buildEmployeeConversationPrompt } from "@/agents/employee/prompt/conversation";
-import { resolveAgentTools } from "@/agents/config";
+import { runEmployeeFlow } from "./ag-ui-employee";
+import { runManagerFlow } from "./ag-ui-manager";
+import { emitState } from "./ag-ui-types";
 import { getMockAuthSession } from "@/lib/auth/session-store";
 import { isAppRole, type AppRole } from "@/lib/auth/session";
 import {
@@ -27,26 +16,72 @@ import {
 import { normalizeOllamaBaseUrl } from "@/lib/ollama-url";
 import { getErrorMessage } from "@/utils/error";
 
-type LeaveAssistantForwardedProps = {
+type AgentConfig = {
   provider?: string;
   openaiApiKey?: string;
   ollamaBaseUrl?: string;
   authRole?: string;
 };
 
+function parseAgentConfig(input: RunAgentInput): AgentConfig {
+  const contextEntry = input.context.find((c) =>
+    c.description.startsWith("Leave assistant configuration"),
+  );
+  if (contextEntry) {
+    try {
+      return JSON.parse(contextEntry.value) as AgentConfig;
+    } catch { /* fall through to forwardedProps */ }
+  }
+  return (input.forwardedProps ?? {}) as AgentConfig;
+}
+
 function agUIMessagesToUIMessages(messages: Message[]): UIMessage[] {
-  return messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => {
-      const text = typeof m.content === "string" ? m.content : "";
-      return {
-        id: m.id,
-        role: m.role as "user" | "assistant",
-        content: text,
-        parts: [{ type: "text" as const, text }],
-        metadata: undefined,
-      };
-    });
+  const result: UIMessage[] = [];
+  const toolCallLocation = new Map<string, { msgIndex: number; partIndex: number }>();
+
+  for (const msg of messages) {
+    if (msg.role === "user") {
+      const text = typeof msg.content === "string" ? msg.content : "";
+      result.push({ id: msg.id, role: "user", parts: [{ type: "text" as const, text }] });
+    } else if (msg.role === "assistant") {
+      const text = typeof msg.content === "string" ? msg.content : "";
+      const parts: UIMessage["parts"] = text ? [{ type: "text" as const, text }] : [];
+
+      if (msg.toolCalls) {
+        for (const toolCall of msg.toolCalls) {
+          toolCallLocation.set(toolCall.id, { msgIndex: result.length, partIndex: parts.length });
+          let input: unknown = {};
+          try { input = JSON.parse(toolCall.function.arguments); } catch { /* empty */ }
+          parts.push({
+            type: "dynamic-tool" as const,
+            toolName: toolCall.function.name,
+            toolCallId: toolCall.id,
+            state: "input-available" as const,
+            input,
+          } as UIMessage["parts"][number]);
+        }
+      }
+
+      if (parts.length > 0) result.push({ id: msg.id, role: "assistant", parts });
+    } else if (msg.role === "tool") {
+      const location = toolCallLocation.get(msg.toolCallId);
+      if (location) {
+        const targetMsg = result[location.msgIndex];
+        const targetPart = targetMsg?.parts[location.partIndex];
+        if (targetPart?.type === "dynamic-tool") {
+          let output: unknown;
+          try { output = JSON.parse(msg.content); } catch { output = msg.content; }
+          targetMsg.parts[location.partIndex] = {
+            ...targetPart,
+            state: "output-available" as const,
+            output,
+          } as UIMessage["parts"][number];
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 export class LeaveAssistantAgent extends AbstractAgent {
@@ -59,176 +94,50 @@ export class LeaveAssistantAgent extends AbstractAgent {
       });
 
       (async () => {
-        const fp = (input.forwardedProps ?? {}) as LeaveAssistantForwardedProps;
+        const config = parseAgentConfig(input);
 
-        const rawRole = fp.authRole?.trim().toLowerCase() ?? "user";
+        const rawRole = (config.authRole ?? "user").trim().toLowerCase();
         const session = await getMockAuthSession(
           isAppRole(rawRole) ? (rawRole as AppRole) : "user",
         );
 
-        const providerOverride = isAIProviderName(fp.provider ?? "")
-          ? (fp.provider as AIProviderName)
+        const providerOverride = isAIProviderName(config.provider ?? "")
+          ? (config.provider as AIProviderName)
           : undefined;
-        const normalizedOllamaBaseUrl = normalizeOllamaBaseUrl(
-          fp.ollamaBaseUrl ?? "",
-        );
+        const normalizedOllamaBaseUrl = normalizeOllamaBaseUrl(config.ollamaBaseUrl ?? "");
         const candidates = getChatModelCandidates({
           provider: providerOverride,
-          openaiApiKey: fp.openaiApiKey,
-          baseUrl:
-            providerOverride === "ollama"
-              ? (normalizedOllamaBaseUrl ?? undefined)
-              : undefined,
+          openaiApiKey: config.openaiApiKey,
+          baseUrl: providerOverride === "ollama" ? (normalizedOllamaBaseUrl ?? undefined) : undefined,
         });
-        const modelConfig = candidates[0];
+        const { model } = candidates[0];
 
         const uiMessages = agUIMessagesToUIMessages(input.messages);
 
-        const decision = await routeConversation({
-          model: modelConfig.model,
-          messages: uiMessages,
-          session,
-        });
+        emitState(observer, { phase: "routing" });
+
+        const decision = await routeConversation({ model, messages: uiMessages, session });
 
         if (decision.type === "deny") {
           const msgId = `deny-${input.runId}`;
-          observer.next({
-            type: EventType.TEXT_MESSAGE_START,
-            messageId: msgId,
-            role: "assistant",
-          });
-          observer.next({
-            type: EventType.TEXT_MESSAGE_CONTENT,
-            messageId: msgId,
-            delta: decision.message,
-          });
+          observer.next({ type: EventType.TEXT_MESSAGE_START, messageId: msgId, role: "assistant" });
+          observer.next({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: msgId, delta: decision.message });
           observer.next({ type: EventType.TEXT_MESSAGE_END, messageId: msgId });
-          observer.next({
-            type: EventType.RUN_FINISHED,
-            threadId: input.threadId,
-            runId: input.runId,
-          });
+          observer.next({ type: EventType.RUN_FINISHED, threadId: input.threadId, runId: input.runId });
           observer.complete();
           return;
         }
 
-        const runPolicy = resolveAgentRunPolicy();
-        const conversation = buildConversationRuntimeContext({
-          messages: uiMessages,
-          messageWindow: runPolicy.messageWindow,
-        });
-
-        let baseSystemPrompt: string;
-        let tools: ToolSet;
-
         if (decision.specialist === "manager") {
-          baseSystemPrompt = buildManagerConversationPrompt(session);
-          tools = resolveAgentTools("manager", session, undefined, modelConfig.model);
+          await runManagerFlow(observer, input.runId, uiMessages, session, model);
         } else {
-          baseSystemPrompt = buildEmployeeConversationPrompt(session);
-          tools = resolveAgentTools("employee", session, {}, modelConfig.model);
+          await runEmployeeFlow(observer, input.runId, uiMessages, session, model);
         }
 
-        const systemPrompt = buildRuntimeSystemPrompt({
-          baseSystemPrompt,
-          latestUserText: conversation.latestUserText,
-          olderContextSummary: conversation.olderContextSummary,
-          hasCompactedHistory: conversation.hasCompactedHistory,
-        });
-
-        const modelMessages = await convertToModelMessages(
-          conversation.recentMessages,
-        );
-
-        const result = streamText({
-          model: modelConfig.model,
-          system: systemPrompt,
-          messages: modelMessages,
-          tools,
-          stopWhen: stepCountIs(runPolicy.stopStepCount),
-          temperature: runPolicy.temperature,
-          maxRetries: runPolicy.maxRetries,
-          maxOutputTokens: runPolicy.maxOutputTokens,
-        });
-
-        let currentTextMsgId: string | null = null;
-
-        for await (const part of result.fullStream) {
-          if (part.type === "text-delta") {
-            if (!currentTextMsgId) {
-              currentTextMsgId = `text-${input.runId}`;
-              observer.next({
-                type: EventType.TEXT_MESSAGE_START,
-                messageId: currentTextMsgId,
-                role: "assistant",
-              });
-            }
-            observer.next({
-              type: EventType.TEXT_MESSAGE_CONTENT,
-              messageId: currentTextMsgId,
-              delta: part.text,
-            });
-          } else if (part.type === "tool-input-start") {
-            if (currentTextMsgId) {
-              observer.next({
-                type: EventType.TEXT_MESSAGE_END,
-                messageId: currentTextMsgId,
-              });
-              currentTextMsgId = null;
-            }
-            observer.next({
-              type: EventType.TOOL_CALL_START,
-              toolCallId: part.id,
-              toolCallName: part.toolName,
-            });
-          } else if (part.type === "tool-input-delta") {
-            observer.next({
-              type: EventType.TOOL_CALL_ARGS,
-              toolCallId: part.id,
-              delta: part.delta,
-            });
-          } else if (part.type === "tool-input-end") {
-            observer.next({
-              type: EventType.TOOL_CALL_END,
-              toolCallId: part.id,
-            });
-          } else if (part.type === "tool-result") {
-            const resultMsgId = `result-${part.toolCallId}`;
-            const output = (part as { output?: unknown }).output;
-            observer.next({
-              type: EventType.TOOL_CALL_RESULT,
-              toolCallId: part.toolCallId,
-              messageId: resultMsgId,
-              content:
-                typeof output === "string" ? output : JSON.stringify(output),
-            });
-          } else if (part.type === "finish-step" && currentTextMsgId) {
-            observer.next({
-              type: EventType.TEXT_MESSAGE_END,
-              messageId: currentTextMsgId,
-            });
-            currentTextMsgId = null;
-          }
-        }
-
-        if (currentTextMsgId) {
-          observer.next({
-            type: EventType.TEXT_MESSAGE_END,
-            messageId: currentTextMsgId,
-          });
-        }
-
-        observer.next({
-          type: EventType.RUN_FINISHED,
-          threadId: input.threadId,
-          runId: input.runId,
-        });
+        observer.next({ type: EventType.RUN_FINISHED, threadId: input.threadId, runId: input.runId });
         observer.complete();
       })().catch((error) => {
-        observer.next({
-          type: EventType.RUN_ERROR,
-          message: getErrorMessage(error),
-        });
+        observer.next({ type: EventType.RUN_ERROR, message: getErrorMessage(error) });
         observer.error(error);
       });
     });
