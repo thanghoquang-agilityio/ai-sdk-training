@@ -12,6 +12,7 @@ function parseAllowedDevOrigins() {
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: parseAllowedDevOrigins(),
+  serverExternalPackages: ["@lancedb/lancedb", "apache-arrow"],
 };
 
 export default nextConfig;

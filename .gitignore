@@ -48,3 +48,6 @@ next-env.d.ts
 .claude
 .codex
 .opencode
+
+# LanceDB vector index (generated — rebuilt automatically on first run)
+/server/db/lancedb/

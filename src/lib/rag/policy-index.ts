@@ -1,36 +1,82 @@
-import { embedMany, embed, cosineSimilarity } from "ai";
-import type { EmbeddingModel } from "ai";
+import "server-only";
+import path from "path";
+import { createHash } from "crypto";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { embed, embedMany } from "ai";
+import type { Table } from "@lancedb/lancedb";
 import { getEmbeddingModel } from "./embed";
 import { POLICY_CHUNKS, type PolicyChunk } from "./policy-chunks";
 
-type IndexedChunk = PolicyChunk & { embedding: number[] };
-
-type PolicyIndex = {
-  model: EmbeddingModel;
-  chunks: IndexedChunk[];
-};
+const DB_PATH = path.join(process.cwd(), "server/db/lancedb");
+const TABLE_NAME = "policy_chunks";
+const HASH_FILE = path.join(DB_PATH, ".policy-hash");
 
 export type PolicySearchResult = Pick<PolicyChunk, "id" | "title" | "body"> & {
   score: number;
 };
 
-let indexPromise: Promise<PolicyIndex> | null = null;
+// Singleton: resolves to the LanceDB table (persisted to disk).
+// Resets to null if initialisation fails so the next request retries.
+let tablePromise: Promise<Table> | null = null;
 
-async function buildIndex(): Promise<PolicyIndex> {
+// SHA-256 of all chunk id+title+body — detects any content change, not just count.
+function computeChunksHash(): string {
+  const content = POLICY_CHUNKS.map((c) => `${c.id}\x00${c.title}\x00${c.body}`).join("\n");
+  return createHash("sha256").update(content).digest("hex");
+}
+
+function readStoredHash(): string | null {
+  if (!existsSync(HASH_FILE)) return null;
+  return readFileSync(HASH_FILE, "utf-8").trim();
+}
+
+function writeStoredHash(hash: string): void {
+  mkdirSync(DB_PATH, { recursive: true });
+  writeFileSync(HASH_FILE, hash, "utf-8");
+}
+
+async function getOrBuildTable(): Promise<Table> {
+  const lancedb = await import("@lancedb/lancedb");
+  const db = await lancedb.connect(DB_PATH);
+
+  const currentHash = computeChunksHash();
+  const storedHash = readStoredHash();
+  const existingTables = await db.tableNames();
+  const tableExists = existingTables.includes(TABLE_NAME);
+
+  // Reuse the persisted index only when content hasn't changed.
+  if (tableExists && storedHash === currentHash) {
+    console.log("[RAG] Reusing persisted LanceDB index (content unchanged).");
+    return db.openTable(TABLE_NAME);
+  }
+
+  if (tableExists) {
+    console.log("[RAG] Policy content changed — rebuilding LanceDB index…");
+    await db.dropTable(TABLE_NAME);
+  } else {
+    console.log("[RAG] Building LanceDB index for", POLICY_CHUNKS.length, "policy chunks…");
+  }
+
   const model = getEmbeddingModel();
   const texts = POLICY_CHUNKS.map((c) => `${c.title}\n\n${c.body}`);
   const { embeddings } = await embedMany({ model, values: texts });
-  const chunks: IndexedChunk[] = POLICY_CHUNKS.map((chunk, i) => ({
-    ...chunk,
-    embedding: embeddings[i],
+
+  const rows = POLICY_CHUNKS.map((chunk, i) => ({
+    id: chunk.id,
+    title: chunk.title,
+    body: chunk.body,
+    vector: embeddings[i],
   }));
-  return { model, chunks };
+
+  const table = await db.createTable(TABLE_NAME, rows);
+  writeStoredHash(currentHash);
+  console.log("[RAG] LanceDB index built and persisted to", DB_PATH);
+  return table;
 }
 
 /**
  * Keyword fallback: TF-style scoring when the embedding model is unavailable.
  * Title matches are weighted 3× higher than body matches.
- * Returns top-k chunks with a score > 0, or all chunks if no keyword matches.
  */
 function keywordSearch(query: string, topK: number): PolicySearchResult[] {
   const stopWords = new Set(["a", "an", "the", "is", "are", "do", "i", "my", "can", "how", "many", "much"]);
@@ -51,47 +97,43 @@ function keywordSearch(query: string, topK: number): PolicySearchResult[] {
   });
 
   const hits = scored.filter((c) => c.score > 0).sort((a, b) => b.score - a.score);
-
-  // If nothing matched, return the first topK chunks as a broad context fallback.
   return (hits.length > 0 ? hits : scored).slice(0, topK);
 }
 
 /**
- * Semantic search over the leave policy chunks.
- * Uses cosine similarity over embeddings when the embedding model is available,
- * and automatically falls back to keyword search otherwise (e.g. Ollama without
- * nomic-embed-text installed).
+ * Semantic search over the leave policy chunks using LanceDB (disk-backed).
+ * Falls back to keyword search if the embedding model is unavailable.
  */
 export async function searchPolicy(
   query: string,
   topK = 3,
 ): Promise<PolicySearchResult[]> {
-  // Try to build / reuse the semantic index.
-  if (!indexPromise) {
-    indexPromise = buildIndex().catch((err) => {
-      indexPromise = null;
+  if (!tablePromise) {
+    tablePromise = getOrBuildTable().catch((err) => {
+      tablePromise = null;
       throw err;
     });
   }
 
   try {
-    const index = await indexPromise;
-    const { embedding: queryEmbedding } = await embed({
-      model: index.model,
-      value: query,
-    });
+    const table = await tablePromise;
+    const model = getEmbeddingModel();
+    const { embedding: queryEmbedding } = await embed({ model, value: query });
 
-    return index.chunks
-      .map(({ id, title, body, embedding }) => ({
-        id,
-        title,
-        body,
-        score: cosineSimilarity(queryEmbedding, embedding),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK);
+    const rows = await table
+      .vectorSearch(queryEmbedding)
+      .distanceType("cosine")
+      .limit(topK)
+      .toArray();
+
+    // LanceDB returns cosine distance (0 = identical). Convert to similarity.
+    return rows.map((row) => ({
+      id: String(row.id),
+      title: String(row.title),
+      body: String(row.body),
+      score: 1 - Number(row._distance),
+    }));
   } catch {
-    // Embedding model unavailable — fall back to keyword search.
     return keywordSearch(query, topK);
   }
 }
