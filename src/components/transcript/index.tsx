@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { type UIMessage } from "ai";
 import { type RefObject } from "react";
 import { LoadingIndicator } from "@/components/chat/loading-indicator";
@@ -15,7 +16,7 @@ type ChatTranscriptProps = {
   userInitials?: string;
   quickActions: QuickAction[];
   onSelectPrompt: (prompt: string) => void;
-  onToolApproval: (id: string, approved: boolean) => void;
+  datePicker?: ReactNode;
 };
 
 export function ChatTranscript({
@@ -27,13 +28,13 @@ export function ChatTranscript({
   userInitials = CHAT_TRANSCRIPT_COPY.userBadge,
   quickActions,
   onSelectPrompt,
-  onToolApproval,
+  datePicker,
 }: ChatTranscriptProps) {
   const lastMessage = messages.at(-1);
 
   return (
     <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
-      {messages.length === 0 ? (
+      {messages.length === 0 && !datePicker ? (
         <ChatEmptyState quickActions={quickActions} onSelectPrompt={onSelectPrompt} />
       ) : (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
@@ -47,12 +48,17 @@ export function ChatTranscript({
               userAvatarLabel={userAvatarLabel}
               userInitials={userInitials}
               onSelectPrompt={onSelectPrompt}
-              onToolApproval={onToolApproval}
             />
           ))}
 
           {isLoading && lastMessage?.role === "user" ? (
             <LoadingIndicator label="Thinking" />
+          ) : null}
+
+          {datePicker ? (
+            <div className="flex justify-start">
+              {datePicker}
+            </div>
           ) : null}
         </div>
       )}

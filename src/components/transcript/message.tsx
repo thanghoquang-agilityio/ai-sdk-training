@@ -2,8 +2,6 @@ import { Fragment } from "react";
 import { type UIMessage } from "ai";
 import { LoadingIndicator } from "@/components/chat/loading-indicator";
 import { MessageAvatar, MessageBubble } from "@/components/chat/message-bubble";
-import { DateRangePickerCard } from "@/components/chat/date-range-picker-card";
-import { ToolApprovalCard } from "@/components/chat/tool-approval-card";
 import { ToolOutputTable } from "@/components/chat/tool-output-table";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -14,10 +12,6 @@ import { formatIsoDateMessage } from "@/utils/date";
 import {
   getToolParts,
   getToolStepText,
-  isApprovalRequestedToolPart,
-  isDatePickerToolPart,
-  getDatePickerLeaveType,
-  getApprovalCardContent,
   getToolStatusCopy,
   getMutationSuccessCard,
   getAssistantInitials,
@@ -50,18 +44,15 @@ type SecondContentProps = {
   textPlacement: { beforeTables: string; afterTables: string | null };
   shouldShowThinkingSkeleton: boolean;
   thinkingLabel: string;
-  approvalParts: Extract<UIMessage["parts"][number], { approval: { id: string } }>[];
-  datePickerParts: { key: string; leaveType: string }[];
   statusParts: { tone: "success" | "error" | "neutral"; text: string }[];
   onSelectPrompt: (prompt: string) => void;
-  onToolApproval: (id: string, approved: boolean) => void;
 };
 
 function MessageSecondContent({
   message, isUser, isLoading, isLastMessage, shouldRenderBubble, embedOutputTablesInBubble,
   text, visibleOutputTables, tableIds, useTableLeadInLayout, textPlacement,
-  shouldShowThinkingSkeleton, thinkingLabel, approvalParts, datePickerParts,
-  statusParts, onSelectPrompt, onToolApproval,
+  shouldShowThinkingSkeleton, thinkingLabel,
+  statusParts, onSelectPrompt,
 }: SecondContentProps) {
   const actionsDisabled = isLoading || !isLastMessage;
   return (
@@ -94,33 +85,6 @@ function MessageSecondContent({
       ) : null}
       {shouldShowThinkingSkeleton ? (
         <LoadingIndicator showAvatar={false} label={thinkingLabel} className="max-w-[72%]" />
-      ) : null}
-      {approvalParts.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {approvalParts.map((part, index) => {
-            const content = getApprovalCardContent(part);
-            if (!content) return null;
-            return (
-              <ToolApprovalCard key={`${message.id}-approval-${part.toolCallId ?? index}`}
-                title={content.title} description={content.description}
-                confirmLabel={content.confirmLabel} cancelLabel={content.cancelLabel}
-                onConfirm={() => onToolApproval(part.approval.id, true)}
-                onCancel={() => onToolApproval(part.approval.id, false)}
-              />
-            );
-          })}
-        </div>
-      ) : null}
-      {datePickerParts.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {datePickerParts.map((part) => (
-            <DateRangePickerCard
-              key={part.key}
-              disabled={isLoading}
-              onSubmit={onSelectPrompt}
-            />
-          ))}
-        </div>
       ) : null}
       {!embedOutputTablesInBubble && visibleOutputTables.length > 0 ? (
         <div className="mt-3 space-y-3">
@@ -193,25 +157,15 @@ type ChatMessageProps = {
   userAvatarLabel?: string;
   userInitials?: string;
   onSelectPrompt: (prompt: string) => void;
-  onToolApproval: (id: string, approved: boolean) => void;
 };
 
 export function ChatMessage({
   message, isLastMessage, isLoading, userAvatarUrl, userAvatarLabel,
-  userInitials, onSelectPrompt, onToolApproval,
+  userInitials, onSelectPrompt,
 }: ChatMessageProps) {
   const rawText = getTextParts(message).join("\n").trim();
   const toolParts = getToolParts(message);
   const isUser = message.role === "user";
-  const approvalParts = toolParts.filter(isApprovalRequestedToolPart);
-  const datePickerParts = isLastMessage && !isLoading
-    ? toolParts
-        .filter(isDatePickerToolPart)
-        .map((part, i) => ({
-          key: `${message.id}-datepicker-${i}`,
-          leaveType: getDatePickerLeaveType(part),
-        }))
-    : [];
   const outputTables = toolParts.flatMap((part, partIndex) =>
     getToolOutputTables(part).map((table) => ({
       ...table,
@@ -260,7 +214,7 @@ export function ChatMessage({
         })
         .filter((item): item is MutationSuccessCard => item !== null);
   const shouldShowThinkingSkeleton =
-    !isUser && isLastMessage && isLoading && text.length === 0 && approvalParts.length === 0;
+    !isUser && isLastMessage && isLoading && text.length === 0;
   const statusParts = toolParts
     .map((part) => getToolStatusCopy(part))
     .filter((item) => item !== null);
@@ -275,16 +229,14 @@ export function ChatMessage({
   const hasSecondContent =
     shouldRenderBubble ||
     shouldShowThinkingSkeleton ||
-    approvalParts.length > 0 ||
-    datePickerParts.length > 0 ||
     (!embedOutputTablesInBubble && visibleOutputTables.length > 0) ||
     statusParts.length > 0;
 
   const secondContentProps: SecondContentProps = {
     message, isUser, isLoading, isLastMessage, shouldRenderBubble, embedOutputTablesInBubble,
     text: displayText, visibleOutputTables, tableIds, useTableLeadInLayout, textPlacement,
-    shouldShowThinkingSkeleton, thinkingLabel, approvalParts, datePickerParts,
-    statusParts, onSelectPrompt, onToolApproval,
+    shouldShowThinkingSkeleton, thinkingLabel,
+    statusParts, onSelectPrompt,
   };
 
   // When a mutation success card exists alongside other content, render

@@ -60,7 +60,7 @@ export function createEmployeeMutationTools(session: MockAuthSession) {
 
     [EMPLOYEE_TOOL_NAME.SUBMIT_MY_TIME_OFF_REQUEST]: tool({
       description: EMPLOYEE_TOOL_DESCRIPTION.SUBMIT_MY_TIME_OFF_REQUEST,
-      needsApproval: true,
+      needsApproval: false,
       inputSchema: z.object({
         leaveType: leaveTypeSchema,
         startDate: z
@@ -89,7 +89,7 @@ export function createEmployeeMutationTools(session: MockAuthSession) {
 
     [EMPLOYEE_TOOL_NAME.CANCEL_MY_TIME_OFF_REQUEST]: tool({
       description: EMPLOYEE_TOOL_DESCRIPTION.CANCEL_MY_TIME_OFF_REQUEST,
-      needsApproval: true,
+      needsApproval: false,
       inputSchema: z.object({
         requestQuery: z
           .string()
