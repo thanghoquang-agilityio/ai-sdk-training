@@ -15,7 +15,7 @@ export function createCollectDateRangeTool() {
     [EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE]: tool({
       description:
         EMPLOYEE_TOOL_DESCRIPTION.COLLECT_DATE_RANGE +
-        " CRITICAL: Call this tool IMMEDIATELY when the leave type is known but dates are missing. After calling this tool, you MUST STOP your turn and wait for the user to select dates from the picker. Do NOT continue talking or call other tools.",
+        " *** FORBIDDEN if the user mentioned ANY date, day, month, or duration in their message — call consult_date_agent instead. *** Use ONLY when zero date information was given, or after a PAST_DATE error. After calling, STOP and wait for user selection.",
       inputSchema: z.object({
         leaveType: leaveTypeSchema,
         reason: z

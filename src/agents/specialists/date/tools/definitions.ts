@@ -4,5 +4,5 @@ export const DATE_AGENT_TOOL_NAME = {
 
 export const DATE_AGENT_TOOL_DESCRIPTION = {
   [DATE_AGENT_TOOL_NAME.CONSULT_DATE_AGENT]:
-    "Invoke the Date Agent (sub-agent) to resolve relative dates (e.g. 'next Monday'), calculate durations, or provide date suggestions. Use this BEFORE calling any tools that require specific dates if the user's dates are ambiguous or not yet in YYYY-MM-DD format.",
+    "Resolve any user date or duration expression into absolute YYYY-MM-DD start and end dates. Call this for ANY of: a named date ('September 15', 'April 30'), a relative date ('next Monday', 'tomorrow'), a date range ('April 30 to May 1'), or a duration ('2 days starting from September 15', '3 days from next Friday'). Pass the user's original text as the query. NEVER ask the user for dates — always call this tool instead.",
 } as const;
