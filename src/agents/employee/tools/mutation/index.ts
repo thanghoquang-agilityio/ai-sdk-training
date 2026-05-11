@@ -44,7 +44,7 @@ export function createEmployeeMutationTools(session: MockAuthSession) {
           .trim()
           .min(1)
           .describe("End date, e.g. 2026-05-02 or next friday."),
-        reason: z.string().trim().min(1).describe("Short reason for the leave."),
+        reason: z.string().trim().min(1).describe("Short reason extracted from the user's message (e.g. 'due to a doctor's appointment' → 'doctor's appointment')."),
         note: OPTIONAL_NOTE_SCHEMA,
       }),
       execute: async ({ leaveType, startDate, endDate, reason, note }) =>
@@ -73,7 +73,7 @@ export function createEmployeeMutationTools(session: MockAuthSession) {
           .trim()
           .min(1)
           .describe("End date, e.g. 2026-05-02 or next friday."),
-        reason: z.string().trim().min(1).describe("Short reason for the leave."),
+        reason: z.string().trim().min(1).describe("Short reason extracted from the user's message (e.g. 'due to a doctor's appointment' → 'doctor's appointment')."),
         note: OPTIONAL_NOTE_SCHEMA,
       }),
       execute: async ({ leaveType, startDate, endDate, reason, note }) =>

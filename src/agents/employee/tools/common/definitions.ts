@@ -16,7 +16,7 @@ export const EMPLOYEE_TOOL_DESCRIPTION = {
   LIST_MY_TIME_OFF_REQUESTS:
     "List the current user's time-off requests. Use for upcoming requests, history, or when you need to identify a request before cancelling.",
   COLLECT_DATE_RANGE:
-    "Show a date range picker in the UI so the user can select start and end dates. Call this as soon as leaveType is known and no dates have been provided. Reason is optional — include it only if the user has already stated it.",
+    "Show a date range picker. FORBIDDEN when user mentioned any date/duration — use consult_date_agent instead. ONLY call this when the user gave zero date information, or after verify returns PAST_DATE error.",
   VERIFY_MY_TIME_OFF_REQUEST:
     "Verify if a leave request is valid (checks dates, overlaps, and balance) before submission. Use this ALWAYS before calling submit_my_time_off_request.",
   SUBMIT_MY_TIME_OFF_REQUEST:

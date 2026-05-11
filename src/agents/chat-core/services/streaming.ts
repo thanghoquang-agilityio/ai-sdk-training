@@ -23,6 +23,17 @@ import type { AgentLogger, AgentName, MessageMetadata } from "../types";
 import type { AppRole } from "@/lib/auth/session";
 import { getErrorMessage } from "@/utils/error";
 
+// Terminal tools end the agent turn immediately after being called.
+const TERMINAL_TOOL_NAMES = ["collect_date_range"] as const;
+
+function hasCalledTerminalTool({ steps }: { steps: StepResult<ToolSet>[] }): boolean {
+  const lastStep = steps[steps.length - 1];
+  if (!lastStep) return false;
+  return (lastStep.toolCalls ?? []).some((call) =>
+    TERMINAL_TOOL_NAMES.includes(call.toolName as typeof TERMINAL_TOOL_NAMES[number]),
+  );
+}
+
 const CONNECTION_ERROR_PATTERNS = [
   "ECONNREFUSED",
   "ENOTFOUND",
@@ -81,7 +92,7 @@ export async function streamAgent(input: StreamAgentInput) {
     system: systemPrompt,
     messages: modelMessages,
     tools: input.tools,
-    stopWhen: stepCountIs(runPolicy.stopStepCount),
+    stopWhen: [stepCountIs(runPolicy.stopStepCount), hasCalledTerminalTool],
     temperature: runPolicy.temperature,
     maxRetries: runPolicy.maxRetries,
     maxOutputTokens: runPolicy.maxOutputTokens,
