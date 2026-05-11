@@ -93,12 +93,12 @@ export function buildTeamActionPrompt(
   );
   const startDate = asOptionalString(request.startDate)?.trim() ?? "";
   const endDate = asOptionalString(request.endDate)?.trim() ?? "";
-  const dateRange = formatHumanDateRange(startDate, endDate);
-  if (!name || !leaveType || leaveType === "—" || !dateRange) return "";
+  const dateStr = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+  if (!name || !leaveType || leaveType === "—" || !dateStr) return "";
   if (action === "approve") {
-    return `Approve ${name}'s ${leaveType} leave ${dateRange}. Comment: Approved.`;
+    return `Approve ${name} ${leaveType} leave ${dateStr}. Comment: Approved.`;
   }
-  return `Reject ${name}'s ${leaveType} leave ${dateRange}. Reason: Not approved.`;
+  return `Reject ${name} ${leaveType} leave ${dateStr}. Reason: Not approved.`;
 }
 
 export function getSelfRequestRowActions(request: UnknownRecord): ToolOutputTableAction[] {

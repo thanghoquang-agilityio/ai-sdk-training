@@ -2,6 +2,7 @@ import type { MockAuthSession } from "@/lib/auth/session";
 import type { EmployeeRecord, RequestStatus, TimeOffRequest } from "@/lib/db/schema";
 import { leaveTypeLabel } from "@/utils/leave";
 import { formatDateRange, getTodayIsoDate, parseIsoDateToUtcDay } from "@/agents/handlers/common/date";
+import { formatHumanDateRange } from "@/utils/date";
 import { normalizeValue, getEmployeeOrThrow } from "./context";
 import type { TimeOffContext } from "./context";
 
@@ -77,6 +78,13 @@ export function overlaps(
  * @param {TimeOffRequest[]} requests
  * @param {string} query
  */
+function normalizeQueryToken(token: string): string {
+  return token
+    .replace(/[''`]s$/i, "")
+    .replace(/[^a-z0-9-]/gi, "")
+    .toLowerCase();
+}
+
 export function filterRequestsByQuery(
   employees: EmployeeRecord[],
   requests: TimeOffRequest[],
@@ -88,6 +96,7 @@ export function filterRequestsByQuery(
   const STOP_WORDS = new Set(["to", "from", "a", "an", "the", "and", "or", "on", "at", "in"]);
   const tokens = normalizedQuery
     .split(/\s+/)
+    .map(normalizeQueryToken)
     .filter((t) => Boolean(t) && !STOP_WORDS.has(t));
 
   if (tokens.length === 0) return requests;
@@ -108,7 +117,8 @@ export function filterRequestsByQuery(
       employee.email,
       employee.team,
       formatDateRange(request.startDate, request.endDate),
-    ].map(normalizeValue);
+      formatHumanDateRange(request.startDate, request.endDate),
+    ].map((v) => normalizeQueryToken(normalizeValue(v)));
 
     // Every token must appear in at least one haystack field, supporting
     // multi-field queries like "Mia Nguyen Annual 2026-05-12 2026-05-13".

@@ -21,7 +21,7 @@ export const MANAGER_TOOL_DESCRIPTION = {
   APPROVE_TEAM_TIME_OFF_REQUEST:
     "Approve one pending request from the current manager's team. This is a sensitive mutation and should go through UI approval before execution.",
   REJECT_TEAM_TIME_OFF_REQUEST:
-    "Reject one pending request from the current manager's team and include a short reason. This is a sensitive mutation and should go through UI approval before execution.",
+    "Reject one pending or approved request from the current manager's team and include a short reason. This is a sensitive mutation and should go through UI approval before execution.",
   CONSULT_DATE_SPECIALIST: DATE_AGENT_TOOL_DESCRIPTION[DATE_AGENT_TOOL_NAME.CONSULT_DATE_AGENT],
   SEARCH_LEAVE_POLICY: POLICY_TOOL_DESCRIPTION[POLICY_TOOL_NAME.SEARCH_LEAVE_POLICY],
 } as const;
