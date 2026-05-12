@@ -1,4 +1,7 @@
-import { CopilotRuntime, copilotRuntimeNextJSAppRouterEndpoint } from "@copilotkit/runtime";
+import {
+  CopilotRuntime,
+  copilotRuntimeNextJSAppRouterEndpoint,
+} from "@copilotkit/runtime";
 import { LeaveAssistantAgent } from "@/agents/chat-core/services/ag-ui-adapter";
 
 export const runtime = "nodejs";
