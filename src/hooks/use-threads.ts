@@ -153,7 +153,6 @@ export function useChatThreads({
   useEffect(() => {
     if (isInternalChangeRef.current) return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setData((prev) => {
       const roleData = prev[role];
       const activeThread = roleData.threads.find((t) => t.id === roleData.activeId);

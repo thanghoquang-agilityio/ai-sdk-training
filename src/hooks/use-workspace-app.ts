@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, type FormEvent } from "react";
-import { useAgent, useAgentContext } from "@copilotkit/react-core/v2";
+import { useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core/v2";
 import type { Message } from "@ag-ui/core";
 import {
   APP_NAME,
@@ -46,6 +46,7 @@ export function useWorkspaceApp(
     },
   });
 
+  const { copilotkit } = useCopilotKit();
   const { agent } = useAgent({ agentId: "leaveAssistant" });
 
   const agentMessages = agent.messages as Message[];
@@ -61,7 +62,6 @@ export function useWorkspaceApp(
 
   const setAgentMessages = useMemo(
     () => (msgs: Message[]) => agent.setMessages(msgs),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [agent],
   );
 
@@ -116,6 +116,7 @@ export function useWorkspaceApp(
         content: messageText,
       };
       agent.addMessage(userMsg);
+      await copilotkit.runAgent({ agent });
     } catch {
       if (options?.restoreInputOnError ?? false) {
         setInput(messageText);
