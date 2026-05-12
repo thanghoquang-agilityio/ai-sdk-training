@@ -2,9 +2,11 @@
 
 import { useSyncExternalStore, useState } from "react";
 import { CopilotKit } from "@copilotkit/react-core";
+import { useInterrupt } from "@copilotkit/react-core/v2";
 import { ProviderSelector } from "@/components/chat/provider-selector";
 import { ChatComposer } from "@/components/chat/composer";
 import { DateRangePickerCard } from "@/components/chat/date-range-picker-card";
+import { ConfirmActionCard } from "@/components/chat/confirm-action-card";
 import { ChatTranscript } from "@/components/transcript";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -146,6 +148,21 @@ function WorkspaceContent({
     <DateRangePickerCard disabled={isLoading} onSubmit={handlePromptSelect} />
   ) : null;
 
+  const confirmCard = useInterrupt({
+    agentId: "leaveAssistant",
+    renderInChat: false,
+    render: ({ event, resolve }) => (
+      <ConfirmActionCard
+        toolName={(event.value as { toolName: string }).toolName}
+        label={(event.value as { label: string }).label}
+        args={(event.value as { args: Record<string, unknown> }).args}
+        disabled={isLoading}
+        onApproveAction={() => resolve({ approved: true })}
+        onRejectAction={() => resolve({ approved: false })}
+      />
+    ),
+  });
+
   return (
     <main className="min-h-screen min-h-dvh px-3 py-3 sm:px-5 sm:py-5">
       <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] min-h-[calc(100dvh-1.5rem)] w-full max-w-[1600px] flex-col gap-3 sm:min-h-[calc(100vh-2.5rem)] sm:min-h-[calc(100dvh-2.5rem)] sm:gap-4 lg:flex-row">
@@ -205,6 +222,7 @@ function WorkspaceContent({
             quickActions={quickActions}
             onSelectPrompt={handlePromptSelect}
             datePicker={datePicker}
+            confirmCard={confirmCard}
           />
 
           <ChatComposer
@@ -212,7 +230,7 @@ function WorkspaceContent({
             canSend={canSend}
             isLoading={isLoading}
             isProviderReady={provider.isProviderReady}
-            pendingApproval={false}
+            pendingApproval={!!confirmCard}
             inputTooltip={
               !provider.isProviderReady
                 ? CHAT_COMPOSER_COPY.verifyProviderTooltip

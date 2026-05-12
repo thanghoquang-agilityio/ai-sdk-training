@@ -17,6 +17,7 @@ type ChatTranscriptProps = {
   quickActions: QuickAction[];
   onSelectPrompt: (prompt: string) => void;
   datePicker?: ReactNode;
+  confirmCard?: ReactNode;
 };
 
 export function ChatTranscript({
@@ -29,12 +30,13 @@ export function ChatTranscript({
   quickActions,
   onSelectPrompt,
   datePicker,
+  confirmCard,
 }: ChatTranscriptProps) {
   const lastMessage = messages.at(-1);
 
   return (
     <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
-      {messages.length === 0 && !datePicker ? (
+      {messages.length === 0 && !datePicker && !confirmCard ? (
         <ChatEmptyState quickActions={quickActions} onSelectPrompt={onSelectPrompt} />
       ) : (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
@@ -58,6 +60,12 @@ export function ChatTranscript({
           {datePicker ? (
             <div className="flex justify-start">
               {datePicker}
+            </div>
+          ) : null}
+
+          {confirmCard ? (
+            <div className="flex justify-start">
+              {confirmCard}
             </div>
           ) : null}
         </div>
