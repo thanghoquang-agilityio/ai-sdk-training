@@ -76,9 +76,6 @@ export function getToolStatusCopy(part: UIMessage["parts"][number]) {
     return null;
   }
 
-  const toolName = getToolName(part);
-  const shortLabel = getFriendlyToolLabelByName(toolName);
-
   switch (part.state) {
     case "output-error":
       return null;

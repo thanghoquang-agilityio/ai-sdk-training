@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { isAppRole } from "@/lib/auth/session";
 import { AUTH_HEADER } from "@/constants/auth";
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const rawRole = req.headers.get(AUTH_HEADER.role)?.trim().toLowerCase();
   const resolvedRole = rawRole && isAppRole(rawRole) ? rawRole : "user";
 
