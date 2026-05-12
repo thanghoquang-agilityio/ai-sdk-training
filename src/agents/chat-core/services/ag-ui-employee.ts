@@ -1,4 +1,4 @@
-import { EventType, type BaseEvent } from "@ag-ui/core";
+import { EventType, type BaseEvent, type CustomEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
 import type { LanguageModel, UIMessage } from "ai";
 import type { MockAuthSession } from "@/lib/auth/session";
@@ -98,6 +98,18 @@ export async function runEmployeeFlow(
     tools: resolveAgentTools("employee", session, {}, model),
     onCollectDateRange: (leaveType) => {
       emitState(observer, { phase: "awaiting_dates", specialist: "employee", collectDateRangeLeaveType: leaveType });
+    },
+    onInterrupt: ({ name, args, label }) => {
+      emitState(observer, {
+        phase: "awaiting_confirmation",
+        specialist: "employee",
+        pendingTool: { name, args, specialist: "employee", label },
+      });
+      observer.next({
+        type: EventType.CUSTOM,
+        name: "on_interrupt",
+        value: { toolName: name, args, label },
+      } as CustomEvent);
     },
   });
 }

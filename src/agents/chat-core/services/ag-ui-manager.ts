@@ -1,4 +1,4 @@
-import type { BaseEvent } from "@ag-ui/core";
+import { EventType, type BaseEvent, type CustomEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
 import type { LanguageModel, UIMessage } from "ai";
 import type { MockAuthSession } from "@/lib/auth/session";
@@ -22,5 +22,17 @@ export async function runManagerFlow(
     uiMessages,
     baseSystemPrompt: buildManagerConversationPrompt(session),
     tools: resolveAgentTools("manager", session, undefined, model),
+    onInterrupt: ({ name, args, label }) => {
+      emitState(observer, {
+        phase: "awaiting_confirmation",
+        specialist: "manager",
+        pendingTool: { name, args, specialist: "manager", label },
+      });
+      observer.next({
+        type: EventType.CUSTOM,
+        name: "on_interrupt",
+        value: { toolName: name, args, label },
+      } as CustomEvent);
+    },
   });
 }
