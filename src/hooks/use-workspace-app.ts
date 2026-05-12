@@ -52,7 +52,7 @@ export function useWorkspaceApp(
   const agentMessages = agent.messages as Message[];
   const isLoading = agent.isRunning;
   const agentState = agent.state as LeaveAssistantState | undefined;
-  const showDatePicker = agentState?.phase === "awaiting_dates" && !isLoading;
+  const showDatePicker = agentState?.phase === "awaiting_dates" && !isLoading && agentMessages.length > 0;
   const collectDateRangeLeaveType = agentState?.collectDateRangeLeaveType;
 
   const messages = useMemo(

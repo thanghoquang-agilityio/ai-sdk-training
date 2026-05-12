@@ -148,7 +148,7 @@ function WorkspaceContent({
     <DateRangePickerCard disabled={isLoading} onSubmit={handlePromptSelect} />
   ) : null;
 
-  const confirmCard = useInterrupt({
+  const interruptCard = useInterrupt({
     agentId: "leaveAssistant",
     renderInChat: false,
     render: ({ event, resolve }) => (
@@ -162,6 +162,9 @@ function WorkspaceContent({
       />
     ),
   });
+  // Hide stale cards that survive a thread switch/delete because CopilotKit's
+  // internal interrupt state isn't cleared when agent.setMessages([]) is called.
+  const confirmCard = messages.length > 0 ? interruptCard : null;
 
   return (
     <main className="min-h-screen min-h-dvh px-3 py-3 sm:px-5 sm:py-5">
