@@ -157,6 +157,8 @@ function WorkspaceContent({
         label={(event.value as { label: string }).label}
         args={(event.value as { args: Record<string, unknown> }).args}
         disabled={isLoading}
+        userAvatarUrl={auth.session.avatar}
+        userInitials={getInitialsFromName(auth.session.name)}
         onApproveAction={() => resolve({ approved: true })}
         onRejectAction={() => resolve({ approved: false })}
       />

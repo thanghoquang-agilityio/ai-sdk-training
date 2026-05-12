@@ -17,7 +17,7 @@ export function createManagerMutationTools(session: MockAuthSession) {
   return {
     [MANAGER_TOOL_NAME.APPROVE_TEAM_TIME_OFF_REQUEST]: tool({
       description: MANAGER_TOOL_DESCRIPTION.APPROVE_TEAM_TIME_OFF_REQUEST,
-      needsApproval: false,
+      needsApproval: true,
       inputSchema: z.object({
         requestQuery: z
           .string()
@@ -44,7 +44,7 @@ export function createManagerMutationTools(session: MockAuthSession) {
 
     [MANAGER_TOOL_NAME.REJECT_TEAM_TIME_OFF_REQUEST]: tool({
       description: MANAGER_TOOL_DESCRIPTION.REJECT_TEAM_TIME_OFF_REQUEST,
-      needsApproval: false,
+      needsApproval: true,
       inputSchema: z.object({
         requestQuery: z
           .string()
