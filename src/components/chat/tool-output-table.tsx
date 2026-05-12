@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { memo, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils/class-name";
@@ -99,7 +99,7 @@ const ACTION_TONE_CLASS: Record<
     "border-rose-400/36 bg-rose-500/16 text-rose-100 hover:border-rose-300/46 hover:bg-rose-500/24",
 };
 
-export function ToolOutputTable({
+export const ToolOutputTable = memo(function ToolOutputTable({
   title,
   columns,
   rows,
@@ -272,4 +272,4 @@ export function ToolOutputTable({
       </div>
     </Card>
   );
-}
+});

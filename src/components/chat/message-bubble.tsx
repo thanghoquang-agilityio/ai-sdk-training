@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/utils/class-name";
 
@@ -10,7 +10,7 @@ type MessageBubbleProps = {
   children?: ReactNode;
 };
 
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   isUser,
   text,
   placeholder,
@@ -43,7 +43,7 @@ export function MessageBubble({
       ) : null}
     </div>
   );
-}
+});
 
 type MessageAvatarProps = {
   initials: string;
@@ -54,7 +54,7 @@ type MessageAvatarProps = {
   children?: ReactNode;
 };
 
-export function MessageAvatar({
+export const MessageAvatar = memo(function MessageAvatar({
   initials,
   isUser,
   avatarUrl,
@@ -75,4 +75,4 @@ export function MessageAvatar({
   }
 
   return <Avatar variant="assistant" size="sm" className="mt-1" />;
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cn } from "@/utils/class-name";
 import {
   APP_ASSISTANT_AVATAR_ALT,
@@ -26,7 +27,7 @@ type AvatarProps =
       className?: string;
     };
 
-export function Avatar(props: AvatarProps) {
+export const Avatar = memo(function Avatar(props: AvatarProps) {
   if (props.variant === "assistant") {
     const { size = "sm", className } = props;
     return (
@@ -76,4 +77,4 @@ export function Avatar(props: AvatarProps) {
       )}
     </div>
   );
-}
+});
