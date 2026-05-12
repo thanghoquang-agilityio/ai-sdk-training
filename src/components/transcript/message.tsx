@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, memo, useMemo } from "react";
 import { type UIMessage } from "ai";
 import { LoadingIndicator } from "@/components/chat/loading-indicator";
 import { MessageAvatar, MessageBubble } from "@/components/chat/message-bubble";
@@ -48,7 +48,7 @@ type SecondContentProps = {
   onSelectPrompt: (prompt: string) => void;
 };
 
-function MessageSecondContent({
+const MessageSecondContent = memo(function MessageSecondContent({
   message, isUser, isLoading, isLastMessage, shouldRenderBubble, embedOutputTablesInBubble,
   text, visibleOutputTables, tableIds, useTableLeadInLayout, textPlacement,
   shouldShowThinkingSkeleton, thinkingLabel,
@@ -109,9 +109,9 @@ function MessageSecondContent({
       ) : null}
     </>
   );
-}
+});
 
-function MutationSuccessCardItem({ card }: { card: MutationSuccessCard }) {
+const MutationSuccessCardItem = memo(function MutationSuccessCardItem({ card }: { card: MutationSuccessCard }) {
   return (
     <div className="w-fit max-w-full overflow-hidden rounded-xl border border-emerald-400/28 bg-emerald-500/6">
       <div className="border-b border-emerald-400/20 bg-emerald-500/8 px-4 py-2">
@@ -147,7 +147,7 @@ function MutationSuccessCardItem({ card }: { card: MutationSuccessCard }) {
       ) : null}
     </div>
   );
-}
+});
 
 type ChatMessageProps = {
   message: UIMessage;
@@ -159,52 +159,69 @@ type ChatMessageProps = {
   onSelectPrompt: (prompt: string) => void;
 };
 
-export function ChatMessage({
+export const ChatMessage = memo(function ChatMessage({
   message, isLastMessage, isLoading, userAvatarUrl, userAvatarLabel,
   userInitials, onSelectPrompt,
 }: ChatMessageProps) {
-  const rawText = getTextParts(message).join("\n").trim();
-  const toolParts = getToolParts(message);
   const isUser = message.role === "user";
-  const outputTables = toolParts.flatMap((part, partIndex) =>
+  const rawText = useMemo(() => getTextParts(message).join("\n").trim(), [message]);
+  const toolParts = useMemo(() => getToolParts(message), [message]);
+
+  const outputTables = useMemo(() => toolParts.flatMap((part, partIndex) =>
     getToolOutputTables(part).map((table) => ({
       ...table,
       key: `${message.id}-${part.toolCallId ?? partIndex}-${table.id}`,
     })),
-  );
-  const currentToolStep = [...toolParts]
+  ), [message.id, toolParts]);
+
+  const currentToolStep = useMemo(() => [...toolParts]
     .reverse()
     .map((part) => getToolStepText(part))
-    .find((step): step is string => Boolean(step));
-  const agentLabel = readMessageMeta(message)?.agentLabel ?? null;
+    .find((step): step is string => Boolean(step)), [toolParts]);
+
+  const agentLabel = useMemo(() => readMessageMeta(message)?.agentLabel ?? null, [message]);
   const thinkingLabel = currentToolStep ?? (agentLabel ? `Assign: ${agentLabel}` : "Thinking");
-  const shouldDeferOutputTables = !isUser && isLastMessage && isLoading;
-  const visibleOutputTables = shouldDeferOutputTables
+
+  const shouldDeferOutputTables = useMemo(() => {
+    if (isUser || !isLastMessage || !isLoading) return false;
+    // If we have at least one tool call that has output, don't defer.
+    // This ensures tables remain visible while the agent is "thinking" about the next step.
+    return toolParts.length > 0 && toolParts.every(part => part.state !== "output-available");
+  }, [isUser, isLastMessage, isLoading, toolParts]);
+  const visibleOutputTables = useMemo(() => shouldDeferOutputTables
     ? []
-    : outputTables.filter((table) => table.rows.length > 0);
+    : outputTables.filter((table) => table.rows.length > 0), [shouldDeferOutputTables, outputTables]);
+
   const embedOutputTablesInBubble = !isUser && visibleOutputTables.length > 0;
-  const tableIds = visibleOutputTables.map((table) => table.id);
-  const useTableLeadInLayout = !isUser && shouldUseTableLeadInLayout(tableIds);
-  const renderedTableLeadIns = useTableLeadInLayout ? getRenderedTableLeadIns(tableIds) : [];
-  const normalizedText =
+  const tableIds = useMemo(() => visibleOutputTables.map((table) => table.id), [visibleOutputTables]);
+  const useTableLeadInLayout = useMemo(() => !isUser && shouldUseTableLeadInLayout(tableIds), [isUser, tableIds]);
+  const renderedTableLeadIns = useMemo(() => useTableLeadInLayout ? getRenderedTableLeadIns(tableIds) : [], [useTableLeadInLayout, tableIds]);
+
+  const normalizedText = useMemo(() =>
     !isUser && visibleOutputTables.length > 0
       ? stripRedundantStructuredListText(rawText)
-      : rawText;
-  const tableLeadInFollowUp = useTableLeadInLayout
+      : rawText, [isUser, visibleOutputTables.length, rawText]);
+
+  const tableLeadInFollowUp = useMemo(() => useTableLeadInLayout
     ? extractTableLeadInFollowUp(normalizedText, renderedTableLeadIns)
-    : null;
+    : null, [useTableLeadInLayout, normalizedText, renderedTableLeadIns]);
+
   const shouldSplitTextAroundTables = !isUser && visibleOutputTables.length > 0 && !useTableLeadInLayout;
-  const textPlacement = useTableLeadInLayout
+  const textPlacement = useMemo(() => useTableLeadInLayout
     ? { beforeTables: "", afterTables: tableLeadInFollowUp }
     : shouldSplitTextAroundTables
       ? splitTextBeforeAndAfterTables(normalizedText)
-      : { beforeTables: normalizedText, afterTables: null };
+      : { beforeTables: normalizedText, afterTables: null }, [useTableLeadInLayout, tableLeadInFollowUp, shouldSplitTextAroundTables, normalizedText]);
+
   const text = textPlacement.beforeTables;
-  const displayText = isUser ? formatIsoDateMessage(text) : text;
-  // While the tool is still in-flight and no text has streamed yet, keep the skeleton visible.
-  // Once loading ends (or text arrives), reveal the card.
-  const shouldDeferSuccessCards = !isUser && isLastMessage && isLoading && text.length === 0;
-  const mutationSuccessCards = shouldDeferSuccessCards
+  const displayText = useMemo(() => isUser ? formatIsoDateMessage(text) : text, [isUser, text]);
+
+  const shouldDeferSuccessCards = useMemo(() => {
+    if (isUser || !isLastMessage || !isLoading) return false;
+    return text.length === 0 && toolParts.every(part => !getMutationSuccessCard(part));
+  }, [isUser, isLastMessage, isLoading, text.length, toolParts]);
+
+  const mutationSuccessCards = useMemo(() => shouldDeferSuccessCards
     ? []
     : toolParts
         .map((part, partIndex) => {
@@ -212,20 +229,24 @@ export function ChatMessage({
           if (!success) return null;
           return { ...success, key: `${message.id}-success-${part.toolCallId ?? partIndex}` } as MutationSuccessCard;
         })
-        .filter((item): item is MutationSuccessCard => item !== null);
-  const shouldShowThinkingSkeleton =
-    !isUser && isLastMessage && isLoading && text.length === 0;
-  const statusParts = toolParts
+        .filter((item): item is MutationSuccessCard => item !== null), [shouldDeferSuccessCards, toolParts, message.id]);
+
+  const shouldShowThinkingSkeleton = useMemo(() => {
+    if (isUser || !isLastMessage || !isLoading) return false;
+    // Show thinking only if we have no text and no output-available tool parts.
+    return text.length === 0 && toolParts.every(part => part.state !== "output-available");
+  }, [isUser, isLastMessage, isLoading, text.length, toolParts]);
+
+  const statusParts = useMemo(() => toolParts
     .map((part) => getToolStatusCopy(part))
-    .filter((item) => item !== null);
+    .filter((item) => item !== null), [toolParts]);
+
   const shouldRenderBubble = text.length > 0 || embedOutputTablesInBubble;
 
-  // Render the rich success card content (reused in both split and single layouts).
   const successCardContent = mutationSuccessCards.map((card) => (
     <MutationSuccessCardItem key={card.key} card={card} />
   ));
 
-  // The second part of the message: text bubble + table + status badges.
   const hasSecondContent =
     shouldRenderBubble ||
     shouldShowThinkingSkeleton ||
@@ -239,9 +260,6 @@ export function ChatMessage({
     statusParts, onSelectPrompt,
   };
 
-  // When a mutation success card exists alongside other content, render
-  // two separate visual messages so the card and the follow-up text/table
-  // appear as distinct chat bubbles.
   const shouldSplitMessage = !isUser && mutationSuccessCards.length > 0 && hasSecondContent;
 
   if (shouldSplitMessage) {
@@ -287,4 +305,4 @@ export function ChatMessage({
       ) : null}
     </article>
   );
-}
+});

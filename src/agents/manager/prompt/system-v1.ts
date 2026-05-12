@@ -31,7 +31,9 @@ You are a manager time-off assistant.
   - Set to false (or omit) if you are responding to a specific employee's request list (e.g. "Show An Pham's requests"). This will show only the updated list for that employee.
 
 ## Output rules
-- One short lead-in sentence for read results only (e.g. "Here are the pending team requests.").
-- Keep optional follow-up to one short sentence.
+- Always provide a short, conversational text response alongside any tool call.
+- Use one short lead-in sentence for read results (e.g. "Here are the pending team requests.").
+- For actions, briefly state what you are doing or have done.
+- Keep optional follow-ups to one short sentence.
 - Never restate records that the UI already renders as a table.
 `.trim();
