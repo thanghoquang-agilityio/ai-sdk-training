@@ -1,21 +1,42 @@
 import type { MockAuthSession } from "@/lib/auth/session";
+import type { LeaveType } from "@/lib/db/schema";
 import { getTodayIsoDate } from "@/agents/handlers/common/date";
-import { resolveAgentFlow, resolveRoutingHints, resolveSystemPrompt } from "@/agents/config";
+import {
+  resolveAgentFlow,
+  resolveRoutingHints,
+  resolveSystemPrompt,
+} from "@/agents/config";
 
 export type PreResolvedDates = {
   startDate: string;
   endDate: string;
 };
 
+export type ExtractedLeaveContext = {
+  leaveType?: LeaveType;
+  reason?: string;
+};
+
+export type PreVerifiedSubmit = {
+  leaveType: LeaveType;
+  startDate: string;
+  endDate: string;
+  reason: string;
+};
+
 /**
  * Builds employee conversation prompt.
  * @param {MockAuthSession} session
  * @param {PreResolvedDates | undefined} preResolvedDates - already resolved YYYY-MM-DD dates from user message
+ * @param {ExtractedLeaveContext | undefined} extractedContext - leave type and reason extracted from conversation history
+ * @param {PreVerifiedSubmit | undefined} preVerified - when server-side verify already passed; model only needs to call submit
  * @returns {string}
  */
 export function buildEmployeeConversationPrompt(
   session: MockAuthSession,
   preResolvedDates?: PreResolvedDates,
+  extractedContext?: ExtractedLeaveContext,
+  preVerified?: PreVerifiedSubmit,
 ): string {
   const systemPrompt = resolveSystemPrompt("employee");
   const today = getTodayIsoDate(session.timeZone);
@@ -37,13 +58,68 @@ Current user:
 - timezone: ${session.timeZone}
 `.trim();
 
+  // When server-side verify already passed — model only needs to call submit.
+  if (preVerified) {
+    return `${base}
+
+### Server-side pre-verification complete
+The conversation above shows that verify_my_time_off_request was already called and returned ok: true.
+Your ONLY action is to call submit_my_time_off_request with the EXACT SAME arguments from the verify call shown in the conversation history above.
+Do NOT recalculate dates. Do NOT write any text. Do NOT call verify_my_time_off_request again. Just call submit_my_time_off_request immediately with the exact args from the verify call above.`;
+  }
+
+  // No dates yet but some context is known — tell the model what's already collected so it
+  // doesn't re-ask, and direct it to call collect_date_range for the missing dates.
+  if (
+    !preResolvedDates &&
+    (extractedContext?.leaveType || extractedContext?.reason)
+  ) {
+    const knownParts: string[] = [];
+    if (extractedContext.leaveType)
+      knownParts.push(`leaveType: ${extractedContext.leaveType}`);
+    if (extractedContext.reason)
+      knownParts.push(`reason: ${extractedContext.reason}`);
+    return `${base}
+
+### Context already collected — dates still needed
+The following has already been provided in this conversation:
+${knownParts.join("\n")}
+Do NOT ask for these again. Your ONLY next action is to call collect_date_range immediately to collect the missing dates.`;
+  }
+
   if (!preResolvedDates) return base;
+
+  const knownLines: string[] = [];
+  if (extractedContext?.leaveType)
+    knownLines.push(`leaveType: ${extractedContext?.leaveType}`);
+  if (extractedContext?.reason)
+    knownLines.push(`reason: ${extractedContext?.reason}`);
+  knownLines.push(`startDate: ${preResolvedDates.startDate}`);
+  knownLines.push(`endDate: ${preResolvedDates.endDate}`);
+
+  const knownBlock = knownLines.join("\n");
+
+  if (!extractedContext?.leaveType || !extractedContext?.reason) {
+    const missingFields: string[] = [];
+    if (!extractedContext?.leaveType) missingFields.push("leave type");
+    if (!extractedContext?.reason) missingFields.push("reason");
+
+    return `${base}
+
+### Missing Context
+${knownBlock}
+
+[SYSTEM_INSTRUCTION]
+Ask the user for the ${missingFields.join(" and ")}.
+Do NOT call any tools. Do NOT recap or summarize known fields.`;
+  }
 
   return `${base}
 
-### Pre-resolved dates
-The user's message contained date mentions that have already been resolved server-side.
-startDate: ${preResolvedDates.startDate}
-endDate: ${preResolvedDates.endDate}
-Skip step 4 (consult_date_agent). Go directly to step 5: call verify_my_time_off_request with these dates.`;
+### Context Complete
+${knownBlock}
+
+[SYSTEM_INSTRUCTION]
+Call verify_my_time_off_request immediately with the values above.
+Do NOT call any tools or recap dates. Stop after tool call.`;
 }
