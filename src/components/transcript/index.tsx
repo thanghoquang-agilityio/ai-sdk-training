@@ -18,6 +18,7 @@ type ChatTranscriptProps = {
   onSelectPrompt: (prompt: string) => void;
   datePicker?: ReactNode;
   confirmCard?: ReactNode;
+  thinkingLabel?: string;
 };
 
 export function ChatTranscript({
@@ -31,6 +32,7 @@ export function ChatTranscript({
   onSelectPrompt,
   datePicker,
   confirmCard,
+  thinkingLabel = "Thinking",
 }: ChatTranscriptProps) {
   const lastMessage = messages.at(-1);
 
@@ -69,7 +71,7 @@ export function ChatTranscript({
 
 
           {isLoading && lastMessage?.role === "user" ? (
-            <LoadingIndicator label="Thinking" />
+            <LoadingIndicator label={thinkingLabel} />
           ) : null}
 
           {datePicker ? (

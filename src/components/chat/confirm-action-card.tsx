@@ -47,7 +47,13 @@ const TOOL_META: Record<string, ActionMeta> = {
   },
 };
 
-const HIDDEN_ARG_KEYS = new Set(["dryRun", "showTeamPending", "requestQuery"]);
+const HIDDEN_ARG_KEYS = new Set([
+  "dryRun",
+  "showTeamPending",
+  "requestQuery",
+  "employeeEmail",
+  "employeeAvatar",
+]);
 
 const ARG_LABEL_MAP: Record<string, string> = {
   requestQuery: "Request",
@@ -100,9 +106,20 @@ function argLabel(key: string): string {
   );
 }
 
-type ArgRow = { key: string; label: string; value: string };
+type ArgRow = {
+  key: string;
+  label: string;
+  value: string;
+  email?: string;
+  avatar?: string;
+};
 
-function buildArgRows(args: Record<string, unknown>, toolName: string): ArgRow[] {
+function buildArgRows(
+  args: Record<string, unknown>,
+  toolName: string,
+  employeeEmail?: string,
+  employeeAvatar?: string,
+): ArgRow[] {
   const rows: ArgRow[] = [];
   const skipped = new Set(HIDDEN_ARG_KEYS);
 
@@ -147,10 +164,20 @@ function buildArgRows(args: Record<string, unknown>, toolName: string): ArgRow[]
       }
     }
 
-    if (employeeName && employeeName.toLowerCase() !== "cancel" && toolName !== "cancel_my_time_off_request") {
+    if (
+      employeeName &&
+      employeeName.toLowerCase() !== "cancel" &&
+      toolName !== "cancel_my_time_off_request"
+    ) {
       // Remove leading "Approve " or "Reject " if present
       employeeName = employeeName.replace(/^(approve|reject)\s+/i, "");
-      rows.push({ key: "employee", label: "Employee", value: employeeName });
+      rows.push({
+        key: "employee",
+        label: "Employee",
+        value: employeeName,
+        email: employeeEmail,
+        avatar: employeeAvatar,
+      });
     }
     if (leaveType) {
       rows.push({ key: "leaveType", label: "Leave type", value: leaveType });
@@ -186,6 +213,8 @@ type ConfirmActionCardProps = {
   disabled?: boolean;
   userAvatarUrl?: string;
   userInitials?: string;
+  employeeEmail?: string;
+  employeeAvatar?: string;
   onApproveAction: () => void | Promise<void>;
   onRejectAction: () => void | Promise<void>;
 };
@@ -197,11 +226,13 @@ export function ConfirmActionCard({
   disabled,
   userAvatarUrl,
   userInitials,
+  employeeEmail,
+  employeeAvatar,
   onApproveAction,
   onRejectAction,
 }: ConfirmActionCardProps) {
   const meta = TOOL_META[toolName];
-  const argRows = buildArgRows(args, toolName);
+  const argRows = buildArgRows(args, toolName, employeeEmail, employeeAvatar);
 
   return (
     <Card className="w-fit max-w-[20rem] px-4 py-4 shadow-[0_10px_26px_rgba(7,12,30,0.25)] overflow-visible">
@@ -245,7 +276,7 @@ export function ConfirmActionCard({
 
       {argRows.length > 0 && (
         <div className="mt-3 space-y-1.5 rounded-xl border border-white/8 bg-white/4 px-3 py-2.5">
-          {argRows.map(({ key, label: rowLabel, value }) => (
+          {argRows.map(({ key, label: rowLabel, value, email, avatar }) => (
             <div
               key={key}
               className="flex justify-between gap-4 font-dm-sans text-xs min-h-[24px] items-center"
@@ -255,16 +286,20 @@ export function ConfirmActionCard({
                 <div className="flex min-w-0 items-center gap-2">
                   <Avatar
                     variant="user"
-                    src={getAvatarUrl(value)}
+                    src={avatar || getAvatarUrl(email || value)}
                     alt={`${value} avatar`}
                     initials={getInitialsFromName(value)}
                     size="sm"
                     className="!h-[22px] !w-[22px] ring-white/15"
                   />
-                  <span className="truncate text-right text-white/78 font-medium">{value}</span>
+                  <span className="truncate text-right text-white/78 font-medium">
+                    {value}
+                  </span>
                 </div>
               ) : (
-                <span className="break-all text-right text-white/78">{value}</span>
+                <span className="break-all text-right text-white/78">
+                  {value}
+                </span>
               )}
             </div>
           ))}

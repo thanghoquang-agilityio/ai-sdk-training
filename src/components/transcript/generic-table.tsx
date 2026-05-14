@@ -194,7 +194,7 @@ export function getGenericTableModel(params: {
   if (includeDateRangeColumn) selectedKeys.push("dateRange");
   if (discoveredKeys.includes("status")) selectedKeys.push("status");
 
-  const excludedKeys = new Set<string>();
+  const excludedKeys = new Set<string>(["label", "id"]);
   if (includeEmployeeColumn) {
     excludedKeys.add("employeeId");
     excludedKeys.add("employeeName");

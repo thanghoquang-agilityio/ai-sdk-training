@@ -100,6 +100,7 @@ function WorkspaceContent({
     messages,
     isLoading,
     showDatePicker,
+    thinkingLabel,
     canSend,
     quickActions,
     headerTitle,
@@ -156,6 +157,14 @@ function WorkspaceContent({
         toolName={(event.value as { toolName: string }).toolName}
         label={(event.value as { label: string }).label}
         args={(event.value as { args: Record<string, unknown> }).args}
+        employeeEmail={
+          (event.value as { args: { employeeEmail?: string } }).args
+            .employeeEmail
+        }
+        employeeAvatar={
+          (event.value as { args: { employeeAvatar?: string } }).args
+            .employeeAvatar
+        }
         disabled={isLoading}
         userAvatarUrl={auth.session.avatar}
         userInitials={getInitialsFromName(auth.session.name)}
@@ -228,6 +237,7 @@ function WorkspaceContent({
             onSelectPrompt={handlePromptSelect}
             datePicker={datePicker}
             confirmCard={confirmCard}
+            thinkingLabel={thinkingLabel}
           />
 
           <ChatComposer

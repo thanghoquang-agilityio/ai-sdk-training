@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useRef, useState, type FormEvent } from "react";
-import { useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core/v2";
+import {
+  useAgent,
+  useAgentContext,
+  useCopilotKit,
+  useFrontendTool,
+} from "@copilotkit/react-core/v2";
+import { useCoAgentStateRender } from "@copilotkit/react-core";
+import { z } from "zod";
 import type { Message } from "@ag-ui/core";
 import {
   APP_NAME,
@@ -29,6 +36,8 @@ export function useWorkspaceApp(
   provider: UseProviderSelectionResult,
 ) {
   const [input, setInput] = useState("");
+  const [frontendDatePicker, setFrontendDatePicker] = useState(false);
+  const [localLeaveType, setLocalLeaveType] = useState<string | undefined>();
 
   const authSession = authSessions[selectedRole] ?? authSessions.user;
   const auth = useMemo(
@@ -37,7 +46,8 @@ export function useWorkspaceApp(
   );
 
   useAgentContext({
-    description: "Leave assistant configuration: provider type, API key, Ollama URL, and current user auth role",
+    description:
+      "Leave assistant configuration: provider type, API key, Ollama URL, and current user auth role",
     value: {
       provider: provider.requestBody.provider,
       openaiApiKey: provider.requestBody.openaiApiKey ?? null,
@@ -52,8 +62,65 @@ export function useWorkspaceApp(
   const agentMessages = agent.messages as Message[];
   const isLoading = agent.isRunning;
   const agentState = agent.state as LeaveAssistantState | undefined;
-  const showDatePicker = agentState?.phase === "awaiting_dates" && !isLoading && agentMessages.length > 0;
-  const collectDateRangeLeaveType = agentState?.collectDateRangeLeaveType;
+
+  // Register collect_date_range as a frontend tool.
+  // When the model calls it, CopilotKit executes this handler client-side —
+  // no server TOOL_CALL_RESULT is emitted, so the handler fires via processAgentResult.
+  useFrontendTool(
+    {
+      name: "collect_date_range",
+      description:
+        "Shows a date range picker to collect leave dates from the user. Call ONLY when the user provided no date information, or after a PAST_DATE validation error.",
+      parameters: z.object({
+        leaveType: z.enum(["annual", "sick", "personal", "unpaid"]).optional(),
+        reason: z.string().optional(),
+      }),
+      handler: async ({ leaveType }) => {
+        setLocalLeaveType(leaveType);
+        setFrontendDatePicker(true);
+        return {
+          ok: true,
+          message:
+            "Date picker displayed. Waiting for user to select a date range.",
+        };
+      },
+      followUp: false,
+    },
+    [],
+  );
+
+  // Register agent state rendering for CopilotKit's native chat components.
+  // In our custom chat, the phase label is derived from agentState directly below.
+  useCoAgentStateRender<LeaveAssistantState>({
+    name: "leaveAssistant",
+    render: ({ state, status }) => {
+      if (status !== "inProgress") return null;
+      if (state?.phase === "routing") return "Routing";
+      if (state?.phase === "resolving_dates") return "Resolving dates";
+      if (state?.phase === "executing") return "Processing";
+      return null;
+    },
+  });
+
+  // Phase-based label for the custom chat's loading indicator.
+  const thinkingLabel = useMemo(() => {
+    if (agentState?.phase === "routing") return "Routing";
+    if (agentState?.phase === "resolving_dates") return "Resolving dates";
+    if (agentState?.phase === "executing") return "Processing";
+    return "Thinking";
+  }, [agentState?.phase]);
+
+  // Date picker is shown via:
+  // 1. useFrontendTool handler — normal collect_date_range tool call path
+  // 2. agentState.phase — past-date pre-stream path in ag-ui-employee.ts
+  // Both paths require messages to exist and loading to be complete, matching the original guard.
+  const showDatePicker =
+    agentMessages.length > 0 &&
+    !isLoading &&
+    (frontendDatePicker || agentState?.phase === "awaiting_dates");
+
+  const collectDateRangeLeaveType =
+    localLeaveType ?? agentState?.collectDateRangeLeaveType;
 
   const messages = useMemo(
     () => agUIMessagesToUIMessages(agentMessages),
@@ -68,9 +135,9 @@ export function useWorkspaceApp(
   const {
     activeThread,
     allThreads,
-    switchThread,
-    createNewThread,
-    deleteThread,
+    switchThread: switchThreadRaw,
+    createNewThread: createNewThreadRaw,
+    deleteThread: deleteThreadRaw,
   } = useChatThreads({
     messages: agentMessages,
     setMessages: setAgentMessages,
@@ -78,12 +145,36 @@ export function useWorkspaceApp(
     role: auth.role,
   });
 
+  function resetDatePickerState() {
+    setFrontendDatePicker(false);
+    setLocalLeaveType(undefined);
+  }
+
+  function switchThread(id: string) {
+    resetDatePickerState();
+    switchThreadRaw(id);
+  }
+
+  function createNewThread() {
+    resetDatePickerState();
+    createNewThreadRaw();
+  }
+
+  function deleteThread(id: string) {
+    resetDatePickerState();
+    deleteThreadRaw(id);
+  }
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const trimmedInput = input.trim();
-  const canSend = trimmedInput.length > 0 && !isLoading && provider.isProviderReady;
+  const canSend =
+    trimmedInput.length > 0 && !isLoading && provider.isProviderReady;
   const isEmptyConversation = messages.length === 0;
-  const quickActions = useMemo(() => getQuickActionsByRole(auth.role), [auth.role]);
+  const quickActions = useMemo(
+    () => getQuickActionsByRole(auth.role),
+    [auth.role],
+  );
 
   const headerTitle = isEmptyConversation
     ? getAppEmptyHeaderTitleByRole(auth.role)
@@ -91,7 +182,9 @@ export function useWorkspaceApp(
   const headerSubtitle = isEmptyConversation
     ? getAppSubtitleByRole(auth.role)
     : (activeThread?.preview ?? getAppSubtitleByRole(auth.role));
-  const headerHint = isEmptyConversation ? getAppEmptyHeaderHintByRole(auth.role) : null;
+  const headerHint = isEmptyConversation
+    ? getAppEmptyHeaderHintByRole(auth.role)
+    : null;
 
   useChatAutoScroll(messagesContainerRef, messages, isLoading);
 
@@ -108,6 +201,8 @@ export function useWorkspaceApp(
     }
 
     setInput("");
+    setFrontendDatePicker(false);
+    setLocalLeaveType(undefined);
 
     try {
       const userMsg: Message = {
@@ -136,6 +231,8 @@ export function useWorkspaceApp(
   function handleRoleChange(role: AppRole) {
     if (role === selectedRole) return;
     setInput("");
+    setFrontendDatePicker(false);
+    setLocalLeaveType(undefined);
     agent.setMessages([]);
     setSelectedRole(role);
   }
@@ -166,6 +263,7 @@ export function useWorkspaceApp(
     agentState,
     showDatePicker,
     collectDateRangeLeaveType,
+    thinkingLabel,
     canSend,
     isEmptyConversation,
     quickActions,
