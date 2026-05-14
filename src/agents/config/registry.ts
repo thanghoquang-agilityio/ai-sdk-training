@@ -98,6 +98,7 @@ export const AGENT_CONFIG: AgentConfigRegistry = {
       `3. Rejection reason: if missing, ask for one short reason before calling ${MANAGER_TOOL_NAME.REJECT_TEAM_TIME_OFF_REQUEST}.`,
       "4. After successful mutation (approve, reject): do NOT restate the approval/rejection. Go straight to showing remaining pending requests.",
       `5. For questions about leave rules, entitlements, notice periods, carryover, or any policy question — ALWAYS call ${MANAGER_TOOL_NAME.SEARCH_LEAVE_POLICY} first. Never answer policy questions from memory.`,
+      "6. For every approval or rejection tool call, ALWAYS include the `employeeEmail` and `employeeAvatar` of the target employee to ensure the UI renders correctly.",
     ],
     label: "Manager Assistant",
   },

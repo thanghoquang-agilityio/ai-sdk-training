@@ -22,6 +22,7 @@ export type FormattedRequest = {
   id: string;
   employeeId: string;
   employeeName: string;
+  employeeEmail: string;
   employeeAvatar: string;
   team: string;
   leaveType: LeaveType;
@@ -125,6 +126,7 @@ export function getEmployeeSummary(session: MockAuthSession) {
     managedEmployees: session.managedEmployees.map((e) => ({
       employeeId: e.employeeId,
       name: e.name,
+      email: e.email,
       avatar: e.avatar,
       team: e.team,
     })),
@@ -148,6 +150,7 @@ export function formatRequest(
     id: request.id,
     employeeId: employee.employeeId,
     employeeName: employee.name,
+    employeeEmail: employee.email,
     employeeAvatar: employee.avatar,
     team: employee.team,
     leaveType: request.leaveType,

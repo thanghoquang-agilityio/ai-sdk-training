@@ -33,6 +33,14 @@ export function createManagerMutationTools(session: MockAuthSession) {
           .describe(
             "Set to true if the context is the team pending queue. Set to false if focusing on a specific member's history.",
           ),
+        employeeEmail: z
+          .string()
+          .optional()
+          .describe("The email of the employee whose request is being approved."),
+        employeeAvatar: z
+          .string()
+          .optional()
+          .describe("The avatar URL of the employee whose request is being approved."),
       }),
       execute: async ({ requestQuery, comment, showTeamPending }) =>
         approveTeamTimeOffRequest(session, {
@@ -64,6 +72,14 @@ export function createManagerMutationTools(session: MockAuthSession) {
           .describe(
             "Set to true if the context is the team pending queue. Set to false if focusing on a specific member's history.",
           ),
+        employeeEmail: z
+          .string()
+          .optional()
+          .describe("The email of the employee whose request is being rejected."),
+        employeeAvatar: z
+          .string()
+          .optional()
+          .describe("The avatar URL of the employee whose request is being rejected."),
       }),
       execute: async ({ requestQuery, comment, showTeamPending }) =>
         rejectTeamTimeOffRequest(session, {

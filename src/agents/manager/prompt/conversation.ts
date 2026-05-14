@@ -11,7 +11,7 @@ export function buildManagerConversationPrompt(
 ): string {
   const systemPrompt = resolveSystemPrompt("manager");
   const managedEmployees = session.managedEmployees
-    .map((e) => `- ${e.name} (${e.employeeId}, ${e.team})`)
+    .map((e) => `- ${e.name} (${e.email}, ${e.avatar}, ${e.employeeId}, ${e.team})`)
     .join("\n");
 
   return `
