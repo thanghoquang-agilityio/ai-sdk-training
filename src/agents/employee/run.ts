@@ -1,4 +1,5 @@
 import type { UIMessage } from "ai";
+import type { LeaveType } from "@/lib/db/schema";
 import { runAgent, type AgentRunInput } from "@/agents/chat-core";
 import { buildEmployeeConversationPrompt, type PreResolvedDates } from "@/agents/employee/prompt/conversation";
 import { resolveAgentTools } from "@/agents/config";
@@ -11,14 +12,14 @@ import { getTextParts } from "@/utils/message";
 const DATE_MENTION_REGEX =
   /\b(\d{4}-\d{2}-\d{2}|january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next\s+\w+|\d+\s+days?\s+(from|starting|beginning))/i;
 
-const LEAVE_TYPE_PATTERNS: Array<[RegExp, "annual" | "sick" | "personal" | "unpaid"]> = [
+const LEAVE_TYPE_PATTERNS: Array<[RegExp, LeaveType]> = [
   [/\bsick\b/i, "sick"],
   [/\bannual\b/i, "annual"],
   [/\bpersonal\b/i, "personal"],
   [/\bunpaid\b/i, "unpaid"],
 ];
 
-function extractLeaveType(text: string): "annual" | "sick" | "personal" | "unpaid" | null {
+function extractLeaveType(text: string): LeaveType | null {
   for (const [regex, type] of LEAVE_TYPE_PATTERNS) {
     if (regex.test(text)) return type;
   }

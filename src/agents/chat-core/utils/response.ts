@@ -4,6 +4,7 @@ import {
   type UIMessage,
 } from "ai";
 import type { AppRole } from "@/lib/auth/session";
+import type { LeaveType } from "@/lib/db/schema";
 import type { AgentMetadata, AgentName, MessageMetadata } from "../types";
 
 type CreateStaticAgentResponseInput = {
@@ -17,7 +18,7 @@ type CreateStaticAgentResponseInput = {
 
 type CreatePastDateResponseInput = {
   errorText: string;
-  leaveType: "annual" | "sick" | "personal" | "unpaid";
+  leaveType: LeaveType;
   reason?: string;
   agent: AgentName;
   accessRole: AppRole;

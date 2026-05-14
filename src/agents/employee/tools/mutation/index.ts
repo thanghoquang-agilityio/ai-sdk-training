@@ -5,13 +5,12 @@ import {
   cancelMyTimeOffRequest,
   submitMyTimeOffRequest,
 } from "@/agents/handlers/time-off";
+import { leaveTypeSchema as baseLeaveTypeSchema } from "@/agents/specialists/date/tools/read/collect";
 import { EMPLOYEE_TOOL_DESCRIPTION, EMPLOYEE_TOOL_NAME } from "../common/definitions";
 
-const leaveTypeSchema = z
-  .enum(["annual", "sick", "personal", "unpaid"])
-  .describe(
-    "Type of leave. Map vacation/PTO to annual, illness/doctor to sick, personal errand to personal.",
-  );
+const leaveTypeSchema = baseLeaveTypeSchema.describe(
+  "Type of leave. Map vacation/PTO to annual, illness/doctor to sick, personal errand to personal.",
+);
 
 const OPTIONAL_NOTE_SCHEMA = z.preprocess(
   (value) => {

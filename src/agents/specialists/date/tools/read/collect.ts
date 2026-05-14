@@ -1,9 +1,10 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { LEAVE_TYPES } from "@/lib/db/schema";
 import { EMPLOYEE_TOOL_DESCRIPTION, EMPLOYEE_TOOL_NAME } from "@/agents/employee/tools/common/definitions";
 
 export const leaveTypeSchema = z
-  .enum(["annual", "sick", "personal", "unpaid"])
+  .enum(LEAVE_TYPES)
   .describe("Type of leave.");
 
 /**
@@ -15,7 +16,7 @@ export function createCollectDateRangeTool() {
     [EMPLOYEE_TOOL_NAME.COLLECT_DATE_RANGE]: tool({
       description:
         EMPLOYEE_TOOL_DESCRIPTION.COLLECT_DATE_RANGE +
-        " *** FORBIDDEN if the user mentioned ANY date, day, month, or duration in their message — call consult_date_agent instead. *** Use ONLY when zero date information was given, or after a PAST_DATE error. After calling, STOP and wait for user selection.",
+        " *** FORBIDDEN if the user mentioned ANY date, day, month, or duration — call consult_date_agent instead. *** Use ONLY when zero date information was given, or after a PAST_DATE error. THIS IS THE ONLY WAY to ask the user for dates — never ask in text. After calling, STOP.",
       inputSchema: z.object({
         leaveType: leaveTypeSchema,
         reason: z

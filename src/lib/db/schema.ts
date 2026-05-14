@@ -1,4 +1,5 @@
-export type LeaveType = "annual" | "sick" | "personal" | "unpaid";
+export const LEAVE_TYPES = ["annual", "sick", "personal", "unpaid"] as const;
+export type LeaveType = (typeof LEAVE_TYPES)[number];
 
 export type RequestStatus =
   | "pending"
