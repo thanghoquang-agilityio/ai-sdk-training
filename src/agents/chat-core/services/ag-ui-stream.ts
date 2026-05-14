@@ -2,6 +2,7 @@ import { EventType, type BaseEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
 import {
   convertToModelMessages,
+  smoothStream,
   stepCountIs,
   streamText,
   type LanguageModel,
@@ -16,10 +17,13 @@ import {
 import { resolveAgentRunPolicy } from "../observers/policy";
 import type { PendingToolCall } from "./ag-ui-types";
 
-function hasCalledAnyTool({ steps }: { steps: StepResult<ToolSet>[] }): boolean {
+// collect_date_range ends the turn immediately — the UI takes over to collect dates.
+const TERMINAL_TOOL_NAMES = new Set(["collect_date_range"]);
+
+function hasCalledTerminalTool({ steps }: { steps: StepResult<ToolSet>[] }): boolean {
   const lastStep = steps[steps.length - 1];
   if (!lastStep) return false;
-  return (lastStep.toolCalls ?? []).length > 0;
+  return (lastStep.toolCalls ?? []).some((call) => TERMINAL_TOOL_NAMES.has(call.toolName));
 }
 
 const INTERRUPT_TOOL_NAMES = new Set([
@@ -56,6 +60,9 @@ type StreamSpecialistOptions = {
   tools: ToolSet;
   onCollectDateRange?: (leaveType?: string) => void;
   onInterrupt?: (pending: Omit<PendingToolCall, "specialist">) => void;
+  onTextDelta?: (delta: string) => void;
+  /** Pre-opened message ID — caller already emitted TEXT_MESSAGE_START; stream continues in it. */
+  initialMessageId?: string;
 };
 
 export async function streamSpecialistEvents(
@@ -80,14 +87,16 @@ export async function streamSpecialistEvents(
     system: systemPrompt,
     messages: modelMessages,
     tools: wrapInterruptTools(opts.tools),
-    stopWhen: [stepCountIs(runPolicy.stopStepCount), hasCalledAnyTool],
+    stopWhen: [stepCountIs(runPolicy.stopStepCount), hasCalledTerminalTool],
     temperature: runPolicy.temperature,
     maxRetries: runPolicy.maxRetries,
     maxOutputTokens: runPolicy.maxOutputTokens,
+    experimental_transform: smoothStream({ delayInMs: runPolicy.streamChunkDelayMs, chunking: /[\s\S]/ }),
   });
 
-  let currentTextMsgId: string | null = null;
+  let currentTextMsgId: string | null = opts.initialMessageId ?? null;
   let textMsgSeq = 0;
+  let hasToolCallInCurrentStep = false;
   const toolCallNames = new Map<string, string>();
   const toolCallArgsBuf = new Map<string, string>();
 
@@ -111,6 +120,7 @@ export async function streamSpecialistEvents(
         messageId: currentTextMsgId,
         delta: part.text,
       });
+      opts.onTextDelta?.(part.text);
     } else if (part.type === "tool-input-start") {
       if (INTERRUPT_TOOL_NAMES.has(part.toolName) && !interceptingToolId) {
         // Suppress this mutation tool — collect args silently
@@ -118,16 +128,23 @@ export async function streamSpecialistEvents(
         interceptingToolName = part.toolName;
         interceptingArgsBuf = "";
       } else if (!interceptingToolId) {
-        if (currentTextMsgId) {
-          observer.next({ type: EventType.TEXT_MESSAGE_END, messageId: currentTextMsgId });
-          currentTextMsgId = null;
+        // Create the message now if none exists so the tool call is attached to it
+        if (!currentTextMsgId) {
+          currentTextMsgId = `text-${opts.runId}-${textMsgSeq++}`;
+          observer.next({
+            type: EventType.TEXT_MESSAGE_START,
+            messageId: currentTextMsgId,
+            role: "assistant",
+          });
         }
+        hasToolCallInCurrentStep = true;
         toolCallNames.set(part.id, part.toolName);
         toolCallArgsBuf.set(part.id, "");
         observer.next({
           type: EventType.TOOL_CALL_START,
           toolCallId: part.id,
           toolCallName: part.toolName,
+          parentMessageId: currentTextMsgId,
         });
       }
     } else if (part.type === "tool-input-delta") {
@@ -172,9 +189,12 @@ export async function streamSpecialistEvents(
         } catch { /* skip */ }
         opts.onCollectDateRange(leaveType);
       }
-    } else if (part.type === "finish-step" && currentTextMsgId) {
-      observer.next({ type: EventType.TEXT_MESSAGE_END, messageId: currentTextMsgId });
-      currentTextMsgId = null;
+    } else if (part.type === "finish-step") {
+      if (currentTextMsgId && !hasToolCallInCurrentStep) {
+        observer.next({ type: EventType.TEXT_MESSAGE_END, messageId: currentTextMsgId });
+        currentTextMsgId = null;
+      }
+      hasToolCallInCurrentStep = false;
     }
   }
 

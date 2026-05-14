@@ -1,4 +1,4 @@
-import { Fragment, memo, useMemo } from "react";
+import { Fragment, memo, useMemo, useRef } from "react";
 import { type UIMessage } from "ai";
 import { LoadingIndicator } from "@/components/chat/loading-indicator";
 import { MessageAvatar, MessageBubble } from "@/components/chat/message-bubble";
@@ -182,12 +182,25 @@ export const ChatMessage = memo(function ChatMessage({
   const agentLabel = useMemo(() => readMessageMeta(message)?.agentLabel ?? null, [message]);
   const thinkingLabel = currentToolStep ?? (agentLabel ? `Assign: ${agentLabel}` : "Thinking");
 
+  // Capture rawText.length at the moment this message first enters the loading state.
+  // -1 = not currently being loaded as the last message.
+  const loadingStartRawTextRef = useRef(-1);
+  const isLastLoading = isLastMessage && isLoading;
+  if (!isLastLoading) {
+    loadingStartRawTextRef.current = -1;
+  } else if (loadingStartRawTextRef.current === -1) {
+    loadingStartRawTextRef.current = rawText.length;
+  }
+
   const shouldDeferOutputTables = useMemo(() => {
     if (isUser || !isLastMessage || !isLoading) return false;
-    // If we have at least one tool call that has output, don't defer.
-    // This ensures tables remain visible while the agent is "thinking" about the next step.
-    return toolParts.length > 0 && toolParts.every(part => part.state !== "output-available");
-  }, [isUser, isLastMessage, isLoading, toolParts]);
+    // Defer only when loading started on an empty message (fresh generation).
+    // If rawText was already populated when loading started, this is a completed
+    // message briefly appearing as "last" — keep its tables visible to avoid flickering.
+    return loadingStartRawTextRef.current === 0;
+  // loadingStartRawTextRef is a ref; isLastMessage/isLoading are its change triggers.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUser, isLastMessage, isLoading]);
   const visibleOutputTables = useMemo(() => shouldDeferOutputTables
     ? []
     : outputTables.filter((table) => table.rows.length > 0), [shouldDeferOutputTables, outputTables]);
@@ -218,8 +231,10 @@ export const ChatMessage = memo(function ChatMessage({
 
   const shouldDeferSuccessCards = useMemo(() => {
     if (isUser || !isLastMessage || !isLoading) return false;
-    return text.length === 0 && toolParts.every(part => !getMutationSuccessCard(part));
-  }, [isUser, isLastMessage, isLoading, text.length, toolParts]);
+    // Wait for text to start streaming before revealing the success card.
+    // This prevents the card from flashing in while the tool call is still in progress.
+    return text.length === 0;
+  }, [isUser, isLastMessage, isLoading, text.length]);
 
   const mutationSuccessCards = useMemo(() => shouldDeferSuccessCards
     ? []
@@ -233,9 +248,10 @@ export const ChatMessage = memo(function ChatMessage({
 
   const shouldShowThinkingSkeleton = useMemo(() => {
     if (isUser || !isLastMessage || !isLoading) return false;
-    // Show thinking only if we have no text and no output-available tool parts.
-    return text.length === 0 && toolParts.every(part => part.state !== "output-available");
-  }, [isUser, isLastMessage, isLoading, text.length, toolParts]);
+    // Show thinking whenever no text has streamed yet (covers the gap between
+    // tool result arriving and the first text token being emitted).
+    return text.length === 0;
+  }, [isUser, isLastMessage, isLoading, text.length]);
 
   const statusParts = useMemo(() => toolParts
     .map((part) => getToolStatusCopy(part))

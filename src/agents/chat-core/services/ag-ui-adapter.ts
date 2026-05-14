@@ -5,6 +5,7 @@ import { type UIMessage } from "ai";
 import { routeConversation } from "./coordinator";
 import { runEmployeeFlow } from "./ag-ui-employee";
 import { runManagerFlow } from "./ag-ui-manager";
+import { streamSpecialistEvents } from "./ag-ui-stream";
 import { emitState, type LeaveAssistantState, type PendingToolCall } from "./ag-ui-types";
 import { getMockAuthSession } from "@/lib/auth/session-store";
 import { isAppRole, type AppRole } from "@/lib/auth/session";
@@ -16,6 +17,8 @@ import {
 import { normalizeOllamaBaseUrl } from "@/lib/ollama-url";
 import { getErrorMessage } from "@/utils/error";
 import { resolveAgentTools } from "@/agents/config";
+import { buildEmployeeConversationPrompt } from "@/agents/employee/prompt/conversation";
+import { buildManagerConversationPrompt } from "@/agents/manager/prompt/conversation";
 import type { Observer } from "rxjs";
 import type { LanguageModel } from "ai";
 import type { MockAuthSession } from "@/lib/auth/session";
@@ -95,6 +98,7 @@ async function handleResumedAction(
   approved: boolean,
   session: MockAuthSession,
   model: LanguageModel,
+  inputMessages: Message[],
 ) {
   emitState(observer, { phase: "executing", specialist: pendingTool.specialist });
 
@@ -117,8 +121,11 @@ async function handleResumedAction(
     return;
   }
 
+  // Open the message that will contain both the tool call and the follow-up stream.
+  const msgId = `resume-msg-${runId}`;
   const toolCallId = `resume-tc-${runId}`;
-  observer.next({ type: EventType.TOOL_CALL_START, toolCallId, toolCallName: pendingTool.name });
+  observer.next({ type: EventType.TEXT_MESSAGE_START, messageId: msgId, role: "assistant" });
+  observer.next({ type: EventType.TOOL_CALL_START, toolCallId, toolCallName: pendingTool.name, parentMessageId: msgId });
   observer.next({ type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(pendingTool.args) });
   observer.next({ type: EventType.TOOL_CALL_END, toolCallId });
 
@@ -127,11 +134,41 @@ async function handleResumedAction(
     { messages: [], toolCallId, abortSignal: new AbortController().signal },
   );
 
+  const resultContent = typeof result === "string" ? result : JSON.stringify(result);
   observer.next({
     type: EventType.TOOL_CALL_RESULT,
     toolCallId,
     messageId: `result-${toolCallId}`,
-    content: typeof result === "string" ? result : JSON.stringify(result),
+    content: resultContent,
+  });
+
+  // Stream a follow-up response using the same message so the result table and
+  // the confirmation text end up in one chat bubble.
+  const existingUIMessages = agUIMessagesToUIMessages(inputMessages);
+  const toolUIMessage: UIMessage = {
+    id: toolCallId,
+    role: "assistant",
+    parts: [{
+      type: "dynamic-tool" as const,
+      toolCallId,
+      toolName: pendingTool.name,
+      state: "output-available" as const,
+      input: pendingTool.args,
+      output: (() => { try { return JSON.parse(resultContent); } catch { return resultContent; } })(),
+    }],
+  };
+
+  const baseSystemPrompt = pendingTool.specialist === "manager"
+    ? buildManagerConversationPrompt(session)
+    : buildEmployeeConversationPrompt(session);
+
+  await streamSpecialistEvents(observer, {
+    runId,
+    model,
+    uiMessages: [...existingUIMessages, toolUIMessage],
+    baseSystemPrompt,
+    tools,
+    initialMessageId: msgId,
   });
 }
 
@@ -169,7 +206,7 @@ export class LeaveAssistantAgent extends AbstractAgent {
         const prevState = input.state as LeaveAssistantState | undefined;
 
         if (resume !== undefined && prevState?.pendingTool) {
-          await handleResumedAction(observer, input.runId, prevState.pendingTool, resume.approved, session, model);
+          await handleResumedAction(observer, input.runId, prevState.pendingTool, resume.approved, session, model, input.messages);
           observer.next({ type: EventType.RUN_FINISHED, threadId: input.threadId, runId: input.runId });
           observer.complete();
           return;
