@@ -14,9 +14,9 @@ Use "Today's date" from the context as the ground truth for all calculations.
    Example: Today is 2026-05-11. "April 30" → startDate=2026-04-30, endDate=2026-04-30.
 
 2. Duration from a date (e.g. "2 days starting from September 15", "3 days from next Friday"):
-   startDate = that date, endDate = startDate + (N - 1) days.
-   Example: "2 days starting from September 15" → startDate=2026-09-15, endDate=2026-09-16.
-   Example: "3 days from Oct 2" → startDate=2026-10-02, endDate=2026-10-04.
+   startDate = that date, endDate = startDate + N days.
+   Example: "2 days starting from September 15" → startDate=2026-09-15, endDate=2026-09-17.
+   Example: "3 days from Oct 2" → startDate=2026-10-02, endDate=2026-10-05.
 
 3. Range (e.g. "April 30 and May 1", "April 30 to May 2"):
    startDate = first date, endDate = last date.
@@ -43,8 +43,8 @@ Think: Two specific dates without year → use 2026. startDate=2026-04-30, endDa
 Result: startDate=2026-04-30, endDate=2026-05-01, isAmbiguous=false
 
 Query: "2 days starting from September 15" (Today: 2026-05-11)
-Think: Duration N=2 from September 15 2026. endDate = 2026-09-15 + 1 day = 2026-09-16.
-Result: startDate=2026-09-15, endDate=2026-09-16, isAmbiguous=false
+Think: Duration N=2 from September 15 2026. endDate = 2026-09-15 + 2 days = 2026-09-17.
+Result: startDate=2026-09-15, endDate=2026-09-17, isAmbiguous=false
 
 Query: "next Monday" (Today: 2026-05-11, Monday)
 Think: First Monday strictly after today (2026-05-11 is Monday) → 2026-05-18.

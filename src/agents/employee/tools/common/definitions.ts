@@ -22,7 +22,7 @@ export const EMPLOYEE_TOOL_DESCRIPTION = {
   VERIFY_MY_TIME_OFF_REQUEST:
     "Verify if a leave request is valid (checks dates, overlaps, and balance) before submission. Use this ALWAYS before calling submit_my_time_off_request.",
   SUBMIT_MY_TIME_OFF_REQUEST:
-    "Create a new time-off request for the current user. ONLY call this after verify_my_time_off_request has returned ok: true. This is a sensitive mutation and should go through UI approval before execution.",
+    "Create a new time-off request for the current user. Call this immediately after verify_my_time_off_request returns ok: true — do NOT ask the user for permission first. The UI shows a confirmation card automatically.",
   CANCEL_MY_TIME_OFF_REQUEST:
     "Cancel one of the current user's cancellable requests. This is a sensitive mutation and should go through UI approval before execution. Use a clear request description such as latest pending request, annual leave on 2026-06-15, or family trip request.",
   CONSULT_DATE_SPECIALIST: DATE_AGENT_TOOL_DESCRIPTION[DATE_AGENT_TOOL_NAME.CONSULT_DATE_AGENT],
