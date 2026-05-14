@@ -20,10 +20,27 @@ import type { PendingToolCall } from "./ag-ui-types";
 // collect_date_range ends the turn immediately — the UI takes over to collect dates.
 const TERMINAL_TOOL_NAMES = new Set(["collect_date_range"]);
 
-function hasCalledTerminalTool({ steps }: { steps: StepResult<ToolSet>[] }): boolean {
+// Frontend tools: server signals the call but lets the client execute them.
+// No TOOL_CALL_RESULT is emitted — CopilotKit sees the pending tool call and
+// dispatches it to the useFrontendTool handler registered on the client.
+const FRONTEND_TOOL_NAMES = new Set(["collect_date_range"]);
+
+// Fallback text emitted when a frontend tool fires before the model streamed any text.
+// Prevents the assistant bubble from being empty (e.g. date picker without explanation).
+const FRONTEND_TOOL_FALLBACK_TEXT: Record<string, string> = {
+  collect_date_range: "Select dates for your time-off request.",
+};
+
+function hasCalledTerminalTool({
+  steps,
+}: {
+  steps: StepResult<ToolSet>[];
+}): boolean {
   const lastStep = steps[steps.length - 1];
   if (!lastStep) return false;
-  return (lastStep.toolCalls ?? []).some((call) => TERMINAL_TOOL_NAMES.has(call.toolName));
+  return (lastStep.toolCalls ?? []).some((call) =>
+    TERMINAL_TOOL_NAMES.has(call.toolName),
+  );
 }
 
 const INTERRUPT_TOOL_NAMES = new Set([
@@ -58,9 +75,10 @@ type StreamSpecialistOptions = {
   uiMessages: UIMessage[];
   baseSystemPrompt: string;
   tools: ToolSet;
-  onCollectDateRange?: (leaveType?: string) => void;
   onInterrupt?: (pending: Omit<PendingToolCall, "specialist">) => void;
   onTextDelta?: (delta: string) => void;
+  /** Fires when a frontend tool call completes (name of the tool). */
+  onFrontendTool?: (toolName: string) => void;
   /** Pre-opened message ID — caller already emitted TEXT_MESSAGE_START; stream continues in it. */
   initialMessageId?: string;
 };
@@ -80,7 +98,9 @@ export async function streamSpecialistEvents(
     olderContextSummary: conversation.olderContextSummary,
     hasCompactedHistory: conversation.hasCompactedHistory,
   });
-  const modelMessages = await convertToModelMessages(conversation.recentMessages);
+  const modelMessages = await convertToModelMessages(
+    conversation.recentMessages,
+  );
 
   const result = streamText({
     model: opts.model,
@@ -91,7 +111,10 @@ export async function streamSpecialistEvents(
     temperature: runPolicy.temperature,
     maxRetries: runPolicy.maxRetries,
     maxOutputTokens: runPolicy.maxOutputTokens,
-    experimental_transform: smoothStream({ delayInMs: runPolicy.streamChunkDelayMs, chunking: /[\s\S]/ }),
+    experimental_transform: smoothStream({
+      delayInMs: runPolicy.streamChunkDelayMs,
+      chunking: /[\s\S]/,
+    }),
   });
 
   let currentTextMsgId: string | null = opts.initialMessageId ?? null;
@@ -136,6 +159,17 @@ export async function streamSpecialistEvents(
             messageId: currentTextMsgId,
             role: "assistant",
           });
+          // Frontend tools with no preceding text: inject a helpful default
+          // message so the assistant bubble isn't empty alongside the UI widget.
+          const fallback = FRONTEND_TOOL_FALLBACK_TEXT[part.toolName];
+          if (fallback && FRONTEND_TOOL_NAMES.has(part.toolName)) {
+            observer.next({
+              type: EventType.TEXT_MESSAGE_CONTENT,
+              messageId: currentTextMsgId,
+              delta: fallback,
+            });
+            opts.onTextDelta?.(fallback);
+          }
         }
         hasToolCallInCurrentStep = true;
         toolCallNames.set(part.id, part.toolName);
@@ -151,47 +185,67 @@ export async function streamSpecialistEvents(
       if (part.id === interceptingToolId) {
         interceptingArgsBuf += part.delta;
       } else {
-        toolCallArgsBuf.set(part.id, (toolCallArgsBuf.get(part.id) ?? "") + part.delta);
-        observer.next({ type: EventType.TOOL_CALL_ARGS, toolCallId: part.id, delta: part.delta });
+        toolCallArgsBuf.set(
+          part.id,
+          (toolCallArgsBuf.get(part.id) ?? "") + part.delta,
+        );
+        observer.next({
+          type: EventType.TOOL_CALL_ARGS,
+          toolCallId: part.id,
+          delta: part.delta,
+        });
       }
     } else if (part.type === "tool-input-end") {
       if (part.id === interceptingToolId) {
         // Args fully received — fire interrupt and exit the stream
         if (currentTextMsgId) {
-          observer.next({ type: EventType.TEXT_MESSAGE_END, messageId: currentTextMsgId });
+          observer.next({
+            type: EventType.TEXT_MESSAGE_END,
+            messageId: currentTextMsgId,
+          });
           currentTextMsgId = null;
         }
         let args: Record<string, unknown> = {};
-        try { args = JSON.parse(interceptingArgsBuf); } catch { /* skip */ }
+        try {
+          args = JSON.parse(interceptingArgsBuf);
+        } catch {
+          /* skip */
+        }
         opts.onInterrupt?.({
           name: interceptingToolName!,
           args,
-          label: INTERRUPT_TOOL_LABELS[interceptingToolName!] ?? interceptingToolName!,
+          label:
+            INTERRUPT_TOOL_LABELS[interceptingToolName!] ??
+            interceptingToolName!,
         });
         return;
       } else {
         observer.next({ type: EventType.TOOL_CALL_END, toolCallId: part.id });
+        const completedToolName = toolCallNames.get(part.id);
+        if (completedToolName && FRONTEND_TOOL_NAMES.has(completedToolName)) {
+          opts.onFrontendTool?.(completedToolName);
+        }
       }
     } else if (part.type === "tool-result") {
-      const output = (part as { output?: unknown }).output;
-      observer.next({
-        type: EventType.TOOL_CALL_RESULT,
-        toolCallId: part.toolCallId,
-        messageId: `result-${part.toolCallId}`,
-        content: typeof output === "string" ? output : JSON.stringify(output),
-      });
-
-      if (toolCallNames.get(part.toolCallId) === "collect_date_range" && opts.onCollectDateRange) {
-        const argsStr = toolCallArgsBuf.get(part.toolCallId) ?? "{}";
-        let leaveType: string | undefined;
-        try {
-          leaveType = (JSON.parse(argsStr) as Record<string, unknown>).leaveType as string | undefined;
-        } catch { /* skip */ }
-        opts.onCollectDateRange(leaveType);
+      const toolName = toolCallNames.get(part.toolCallId);
+      if (!FRONTEND_TOOL_NAMES.has(toolName ?? "")) {
+        // Backend tools: forward the result into the AG-UI message stream.
+        const output = (part as { output?: unknown }).output;
+        observer.next({
+          type: EventType.TOOL_CALL_RESULT,
+          toolCallId: part.toolCallId,
+          messageId: `result-${part.toolCallId}`,
+          content: typeof output === "string" ? output : JSON.stringify(output),
+        });
       }
+      // Frontend tools (e.g. collect_date_range): no TOOL_CALL_RESULT is emitted.
+      // CopilotKit detects the unresolved tool call and invokes the useFrontendTool handler.
     } else if (part.type === "finish-step") {
       if (currentTextMsgId && !hasToolCallInCurrentStep) {
-        observer.next({ type: EventType.TEXT_MESSAGE_END, messageId: currentTextMsgId });
+        observer.next({
+          type: EventType.TEXT_MESSAGE_END,
+          messageId: currentTextMsgId,
+        });
         currentTextMsgId = null;
       }
       hasToolCallInCurrentStep = false;
@@ -199,6 +253,9 @@ export async function streamSpecialistEvents(
   }
 
   if (currentTextMsgId) {
-    observer.next({ type: EventType.TEXT_MESSAGE_END, messageId: currentTextMsgId });
+    observer.next({
+      type: EventType.TEXT_MESSAGE_END,
+      messageId: currentTextMsgId,
+    });
   }
 }

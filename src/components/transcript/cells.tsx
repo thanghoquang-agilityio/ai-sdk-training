@@ -39,10 +39,11 @@ export function renderStatusChip(status: string) {
 
 export function renderEmployeeCell(request: UnknownRecord) {
   const employeeName = asString(request.employeeName);
+  const employeeEmail = asString(request.employeeEmail);
   const employeeTeam = asString(request.team, "");
   const employeeAvatar =
     asOptionalString(request.employeeAvatar)?.trim() ||
-    getAvatarUrl(employeeName);
+    getAvatarUrl(employeeEmail);
 
   return (
     <div className="flex min-w-0 items-center gap-2.5">

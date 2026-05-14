@@ -199,7 +199,6 @@ export const ChatMessage = memo(function ChatMessage({
     // message briefly appearing as "last" — keep its tables visible to avoid flickering.
     return loadingStartRawTextRef.current === 0;
   // loadingStartRawTextRef is a ref; isLastMessage/isLoading are its change triggers.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUser, isLastMessage, isLoading]);
   const visibleOutputTables = useMemo(() => shouldDeferOutputTables
     ? []
@@ -308,7 +307,7 @@ export const ChatMessage = memo(function ChatMessage({
           <div className={mutationSuccessCards.length > 0 ? "mt-3" : undefined}>
             <MessageSecondContent {...secondContentProps} />
           </div>
-        ) : (!isUser && !isLoading && isLastMessage && mutationSuccessCards.length === 0) ? (
+        ) : (!isUser && !isLoading && isLastMessage && mutationSuccessCards.length === 0 && toolParts.length === 0) ? (
           <p className="font-dm-sans text-sm text-white/50">
             Something went wrong. Please try again.
           </p>
