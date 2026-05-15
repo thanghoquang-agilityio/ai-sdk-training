@@ -239,6 +239,30 @@
       "note": "tired",
       "createdAt": "2026-04-28T18:00:07.886Z",
       "updatedAt": "2026-04-28T18:00:07.886Z"
+    },
+    {
+      "id": "niSPOwXbk3Y",
+      "employeeId": "EMP-1001",
+      "leaveType": "annual",
+      "startDate": "2026-05-19",
+      "endDate": "2026-05-19",
+      "days": 1,
+      "status": "pending",
+      "reason": "have a trip",
+      "createdAt": "2026-05-15T09:23:34.023Z",
+      "updatedAt": "2026-05-15T09:23:34.023Z"
+    },
+    {
+      "id": "8AaNZ8QowhI",
+      "employeeId": "EMP-1001",
+      "leaveType": "sick",
+      "startDate": "2026-05-22",
+      "endDate": "2026-05-22",
+      "days": 1,
+      "status": "pending",
+      "reason": "have a trip",
+      "createdAt": "2026-05-15T10:06:53.915Z",
+      "updatedAt": "2026-05-15T10:06:53.915Z"
     }
   ],
   "updatedAt": "2026-04-22T08:49:39.560Z",
