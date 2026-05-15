@@ -1,5 +1,11 @@
 import { AbstractAgent } from "@ag-ui/client";
-import { EventType, type BaseEvent, type RunAgentInput, type Message } from "@ag-ui/core";
+import {
+  EventType,
+  type AgentCapabilities,
+  type BaseEvent,
+  type RunAgentInput,
+  type Message,
+} from "@ag-ui/core";
 import { Observable } from "rxjs";
 import { type UIMessage } from "ai";
 import { routeConversation } from "./coordinator";
@@ -7,6 +13,11 @@ import { runEmployeeFlow } from "./ag-ui-employee";
 import { runManagerFlow } from "./ag-ui-manager";
 import { streamSpecialistEvents } from "./ag-ui-stream";
 import { emitState, type LeaveAssistantState, type PendingToolCall } from "./ag-ui-types";
+import {
+  ErrorBoundaryMiddleware,
+  MetricsMiddleware,
+  VerifyEventsMiddleware,
+} from "@/lib/ag-ui/middleware";
 import { getMockAuthSession } from "@/lib/auth/session-store";
 import { isAppRole, type AppRole } from "@/lib/auth/session";
 import {
@@ -15,7 +26,7 @@ import {
   type AIProviderName,
 } from "@/lib/ai-provider";
 import { normalizeOllamaBaseUrl } from "@/lib/ollama-url";
-import { getErrorMessage } from "@/utils/error";
+import { agUIMessagesToUIMessages } from "@/utils/message-adapter";
 import { resolveAgentTools } from "@/agents/config";
 import { buildEmployeeConversationPrompt } from "@/agents/employee/prompt/conversation";
 import { buildManagerConversationPrompt } from "@/agents/manager/prompt/conversation";
@@ -28,67 +39,36 @@ type AgentConfig = {
   openaiApiKey?: string;
   ollamaBaseUrl?: string;
   authRole?: string;
+  additionalInstructions?: string;
 };
 
 function parseAgentConfig(input: RunAgentInput): AgentConfig {
-  const contextEntry = input.context.find((c) =>
+  const configEntry = input.context.find((c) =>
     c.description.startsWith("Leave assistant configuration"),
   );
-  if (contextEntry) {
+  const instructionsEntry = input.context.find((c) =>
+    c.description.startsWith("Additional behavioral instructions"),
+  );
+
+  let config: AgentConfig = {};
+  if (configEntry) {
     try {
-      return JSON.parse(contextEntry.value) as AgentConfig;
+      config = JSON.parse(configEntry.value) as AgentConfig;
     } catch { /* fall through to forwardedProps */ }
-  }
-  return (input.forwardedProps ?? {}) as AgentConfig;
-}
-
-function agUIMessagesToUIMessages(messages: Message[]): UIMessage[] {
-  const result: UIMessage[] = [];
-  const toolCallLocation = new Map<string, { msgIndex: number; partIndex: number }>();
-
-  for (const msg of messages) {
-    if (msg.role === "user") {
-      const text = typeof msg.content === "string" ? msg.content : "";
-      result.push({ id: msg.id, role: "user", parts: [{ type: "text" as const, text }] });
-    } else if (msg.role === "assistant") {
-      const text = typeof msg.content === "string" ? msg.content : "";
-      const parts: UIMessage["parts"] = text ? [{ type: "text" as const, text }] : [];
-
-      if (msg.toolCalls) {
-        for (const toolCall of msg.toolCalls) {
-          toolCallLocation.set(toolCall.id, { msgIndex: result.length, partIndex: parts.length });
-          let input: unknown = {};
-          try { input = JSON.parse(toolCall.function.arguments); } catch { /* empty */ }
-          parts.push({
-            type: "dynamic-tool" as const,
-            toolName: toolCall.function.name,
-            toolCallId: toolCall.id,
-            state: "input-available" as const,
-            input,
-          } as UIMessage["parts"][number]);
-        }
-      }
-
-      if (parts.length > 0) result.push({ id: msg.id, role: "assistant", parts });
-    } else if (msg.role === "tool") {
-      const location = toolCallLocation.get(msg.toolCallId);
-      if (location) {
-        const targetMsg = result[location.msgIndex];
-        const targetPart = targetMsg?.parts[location.partIndex];
-        if (targetPart?.type === "dynamic-tool") {
-          let output: unknown;
-          try { output = JSON.parse(msg.content); } catch { output = msg.content; }
-          targetMsg.parts[location.partIndex] = {
-            ...targetPart,
-            state: "output-available" as const,
-            output,
-          } as UIMessage["parts"][number];
-        }
-      }
-    }
+  } else {
+    config = (input.forwardedProps ?? {}) as AgentConfig;
   }
 
-  return result;
+  if (instructionsEntry) {
+    try {
+      const parsed = JSON.parse(instructionsEntry.value) as { additionalInstructions?: string };
+      if (parsed.additionalInstructions) {
+        config = { ...config, additionalInstructions: parsed.additionalInstructions };
+      }
+    } catch { /* ignore malformed instructions entry */ }
+  }
+
+  return config;
 }
 
 async function handleResumedAction(
@@ -99,6 +79,7 @@ async function handleResumedAction(
   session: MockAuthSession,
   model: LanguageModel,
   inputMessages: Message[],
+  additionalInstructions?: string,
 ) {
   emitState(observer, { phase: "executing", specialist: pendingTool.specialist });
 
@@ -121,7 +102,6 @@ async function handleResumedAction(
     return;
   }
 
-  // Open the message that will contain both the tool call and the follow-up stream.
   const msgId = `resume-msg-${runId}`;
   const toolCallId = `resume-tc-${runId}`;
   observer.next({ type: EventType.TEXT_MESSAGE_START, messageId: msgId, role: "assistant" });
@@ -142,8 +122,6 @@ async function handleResumedAction(
     content: resultContent,
   });
 
-  // Stream a follow-up response using the same message so the result table and
-  // the confirmation text end up in one chat bubble.
   const existingUIMessages = agUIMessagesToUIMessages(inputMessages);
   const toolUIMessage: UIMessage = {
     id: toolCallId,
@@ -158,7 +136,7 @@ async function handleResumedAction(
     }],
   };
 
-  const baseSystemPrompt = pendingTool.specialist === "manager"
+  const basePrompt = pendingTool.specialist === "manager"
     ? buildManagerConversationPrompt(session)
     : buildEmployeeConversationPrompt(session);
 
@@ -166,13 +144,38 @@ async function handleResumedAction(
     runId,
     model,
     uiMessages: [...existingUIMessages, toolUIMessage],
-    baseSystemPrompt,
+    baseSystemPrompt: additionalInstructions
+      ? `${basePrompt}\n\n${additionalInstructions}`
+      : basePrompt,
     tools,
     initialMessageId: msgId,
   });
 }
 
 export class LeaveAssistantAgent extends AbstractAgent {
+  constructor() {
+    super();
+    // VerifyEvents outermost (protocol validation), ErrorBoundary innermost (catches agent errors).
+    this.use(
+      new VerifyEventsMiddleware(),
+      new MetricsMiddleware(),
+      new ErrorBoundaryMiddleware(),
+    );
+  }
+
+  async getCapabilities(): Promise<AgentCapabilities> {
+    return {
+      identity: {
+        name: "Leave Assistant",
+        type: "custom",
+        description: "Leave management assistant — balance checks, requests, approvals, and policy Q&A.",
+      },
+      transport: { streaming: true },
+      state: { snapshots: true },
+      humanInTheLoop: { supported: true, approvals: true },
+    };
+  }
+
   run(input: RunAgentInput): Observable<BaseEvent> {
     return new Observable((observer) => {
       observer.next({
@@ -200,20 +203,21 @@ export class LeaveAssistantAgent extends AbstractAgent {
         });
         const { model } = candidates[0];
 
-        // Check for HITL resume signal
         const forwardedCommand = (input.forwardedProps as Record<string, unknown> | undefined)?.command as Record<string, unknown> | undefined;
         const resume = forwardedCommand?.resume as { approved: boolean } | undefined;
         const prevState = input.state as LeaveAssistantState | undefined;
 
         if (resume !== undefined && prevState?.pendingTool) {
-          await handleResumedAction(observer, input.runId, prevState.pendingTool, resume.approved, session, model, input.messages);
+          await handleResumedAction(
+            observer, input.runId, prevState.pendingTool, resume.approved,
+            session, model, input.messages, config.additionalInstructions,
+          );
           observer.next({ type: EventType.RUN_FINISHED, threadId: input.threadId, runId: input.runId });
           observer.complete();
           return;
         }
 
         const uiMessages = agUIMessagesToUIMessages(input.messages);
-
         emitState(observer, { phase: "routing" });
 
         const decision = await routeConversation({ model, messages: uiMessages, session });
@@ -229,16 +233,16 @@ export class LeaveAssistantAgent extends AbstractAgent {
         }
 
         if (decision.specialist === "manager") {
-          await runManagerFlow(observer, input.runId, uiMessages, session, model);
+          await runManagerFlow(observer, input.runId, uiMessages, session, model, config.additionalInstructions);
         } else {
-          await runEmployeeFlow(observer, input.runId, uiMessages, session, model);
+          await runEmployeeFlow(observer, input.runId, uiMessages, session, model, config.additionalInstructions);
         }
 
         observer.next({ type: EventType.RUN_FINISHED, threadId: input.threadId, runId: input.runId });
         observer.complete();
       })().catch((error) => {
-        observer.next({ type: EventType.RUN_ERROR, message: getErrorMessage(error) });
-        observer.error(error);
+        // Let ErrorBoundaryMiddleware convert this Observable error into a RUN_ERROR event.
+        observer.error(error instanceof Error ? error : new Error(String(error)));
       });
     });
   }

@@ -160,6 +160,7 @@ export async function streamSpecialistEvents(
 
   let currentTextMsgId: string | null = opts.initialMessageId ?? null;
   let textMsgSeq = 0;
+  let stepSeq = 0;
   let hasToolCallInCurrentStep = false;
   const toolCallNames = new Map<string, string>();
   const toolCallArgsBuf = new Map<string, string>();
@@ -170,7 +171,12 @@ export async function streamSpecialistEvents(
   let interceptingArgsBuf = "";
 
   for await (const part of result.fullStream) {
-    if (part.type === "text-delta") {
+    if (part.type === "start-step") {
+      observer.next({
+        type: EventType.STEP_STARTED,
+        stepName: `step-${opts.runId}-${stepSeq}`,
+      });
+    } else if (part.type === "text-delta") {
       if (!currentTextMsgId) {
         currentTextMsgId = `text-${opts.runId}-${textMsgSeq++}`;
         observer.next({
@@ -289,6 +295,11 @@ export async function streamSpecialistEvents(
         });
         currentTextMsgId = null;
       }
+      observer.next({
+        type: EventType.STEP_FINISHED,
+        stepName: `step-${opts.runId}-${stepSeq}`,
+      });
+      stepSeq++;
       hasToolCallInCurrentStep = false;
     }
   }
