@@ -7,7 +7,6 @@ import {
   useCopilotKit,
   useFrontendTool,
 } from "@copilotkit/react-core/v2";
-import { useCoAgentStateRender } from "@copilotkit/react-core";
 import { z } from "zod";
 import type { Message } from "@ag-ui/core";
 import {
@@ -19,11 +18,13 @@ import {
 import {
   CHAT_COMPOSER_COPY,
   CHAT_HELPER_COPY_BY_ROLE,
-  getQuickActionsByRole,
 } from "@/constants/chat";
+import { useCopilotSuggestions } from "@/hooks/use-copilot-suggestions";
 import { PROVIDER_HELPER_HINT_COPY } from "@/constants/provider";
 import { useChatAutoScroll } from "@/hooks/use-auto-scroll";
 import { useChatThreads } from "@/hooks/use-threads";
+import { useCopilotReadable } from "@/hooks/use-copilot-readable";
+import { useCopilotRoleInstructions } from "@/hooks/use-copilot-additional-instructions";
 import type { UseProviderSelectionResult } from "@/types/provider";
 import type { AppRole, MockAuthSession } from "@/lib/auth/session";
 import { agUIMessagesToUIMessages } from "@/utils/message-adapter";
@@ -45,19 +46,40 @@ export function useWorkspaceApp(
     [authSession, selectedRole],
   );
 
+  // Memoize so useAgentContext's internal useMemo([value]) only re-runs when
+  // the content actually changes, not on every parent render.
+  // Omit optional keys entirely (rather than null) so parseAgentConfig receives
+  // string | undefined — matching AgentConfig — not string | null.
+  const agentContextValue = useMemo(() => {
+    const config: Record<string, string> = {
+      provider: provider.requestBody.provider,
+      authRole: selectedRole,
+    };
+    if (provider.requestBody.openaiApiKey) {
+      config.openaiApiKey = provider.requestBody.openaiApiKey;
+    }
+    if (provider.requestBody.ollamaBaseUrl) {
+      config.ollamaBaseUrl = provider.requestBody.ollamaBaseUrl;
+    }
+    return config;
+  }, [
+    provider.requestBody.provider,
+    provider.requestBody.openaiApiKey,
+    provider.requestBody.ollamaBaseUrl,
+    selectedRole,
+  ]);
+
   useAgentContext({
     description:
       "Leave assistant configuration: provider type, API key, Ollama URL, and current user auth role",
-    value: {
-      provider: provider.requestBody.provider,
-      openaiApiKey: provider.requestBody.openaiApiKey ?? null,
-      ollamaBaseUrl: provider.requestBody.ollamaBaseUrl ?? null,
-      authRole: selectedRole,
-    },
+    value: agentContextValue,
   });
 
+  useCopilotReadable(authSession, selectedRole);
+  useCopilotRoleInstructions(selectedRole);
+
   const { copilotkit } = useCopilotKit();
-  const { agent } = useAgent({ agentId: "leaveAssistant" });
+  const { agent } = useAgent({ agentId: "leaveAssistant", throttleMs: 50 });
 
   const agentMessages = agent.messages as Message[];
   const isLoading = agent.isRunning;
@@ -88,19 +110,6 @@ export function useWorkspaceApp(
     },
     [],
   );
-
-  // Register agent state rendering for CopilotKit's native chat components.
-  // In our custom chat, the phase label is derived from agentState directly below.
-  useCoAgentStateRender<LeaveAssistantState>({
-    name: "leaveAssistant",
-    render: ({ state, status }) => {
-      if (status !== "inProgress") return null;
-      if (state?.phase === "routing") return "Routing";
-      if (state?.phase === "resolving_dates") return "Resolving dates";
-      if (state?.phase === "executing") return "Processing";
-      return null;
-    },
-  });
 
   // Phase-based label for the custom chat's loading indicator.
   const thinkingLabel = useMemo(() => {
@@ -172,10 +181,7 @@ export function useWorkspaceApp(
   const canSend =
     trimmedInput.length > 0 && !isLoading && provider.isProviderReady;
   const isEmptyConversation = messages.length === 0;
-  const quickActions = useMemo(
-    () => getQuickActionsByRole(auth.role),
-    [auth.role],
-  );
+  const quickActions = useCopilotSuggestions(auth.role);
 
   const headerTitle = isEmptyConversation
     ? getAppEmptyHeaderTitleByRole(auth.role)

@@ -2,11 +2,9 @@
 
 import { useSyncExternalStore, useState } from "react";
 import { CopilotKit } from "@copilotkit/react-core";
-import { useInterrupt } from "@copilotkit/react-core/v2";
 import { ProviderSelector } from "@/components/chat/provider-selector";
 import { ChatComposer } from "@/components/chat/composer";
 import { DateRangePickerCard } from "@/components/chat/date-range-picker-card";
-import { ConfirmActionCard } from "@/components/chat/confirm-action-card";
 import { ChatTranscript } from "@/components/transcript";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -23,6 +21,7 @@ import { Text } from "@/components/ui/text";
 import { getInitialsFromName } from "@/utils/avatar";
 import { useProviderSelection } from "@/hooks/use-provider";
 import { useWorkspaceApp } from "@/hooks/use-workspace-app";
+import { useHumanInTheLoop } from "@/hooks/use-human-in-the-loop";
 
 const ALLOWED_PROVIDERS: AIProviderName[] = isProductionLike()
   ? ["openai"]
@@ -149,33 +148,14 @@ function WorkspaceContent({
     <DateRangePickerCard disabled={isLoading} onSubmit={handlePromptSelect} />
   ) : null;
 
-  const interruptCard = useInterrupt({
-    agentId: "leaveAssistant",
-    renderInChat: false,
-    render: ({ event, resolve }) => (
-      <ConfirmActionCard
-        toolName={(event.value as { toolName: string }).toolName}
-        label={(event.value as { label: string }).label}
-        args={(event.value as { args: Record<string, unknown> }).args}
-        employeeEmail={
-          (event.value as { args: { employeeEmail?: string } }).args
-            .employeeEmail
-        }
-        employeeAvatar={
-          (event.value as { args: { employeeAvatar?: string } }).args
-            .employeeAvatar
-        }
-        disabled={isLoading}
-        userAvatarUrl={auth.session.avatar}
-        userInitials={getInitialsFromName(auth.session.name)}
-        onApproveAction={() => resolve({ approved: true })}
-        onRejectAction={() => resolve({ approved: false })}
-      />
-    ),
-  });
   // Hide stale cards that survive a thread switch/delete because CopilotKit's
   // internal interrupt state isn't cleared when agent.setMessages([]) is called.
-  const confirmCard = messages.length > 0 ? interruptCard : null;
+  const confirmCard = useHumanInTheLoop({
+    agentId: "leaveAssistant",
+    session: auth.session,
+    isLoading,
+    hasMessages: messages.length > 0,
+  });
 
   return (
     <main className="min-h-screen min-h-dvh px-3 py-3 sm:px-5 sm:py-5">
