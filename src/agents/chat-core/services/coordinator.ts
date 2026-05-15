@@ -21,10 +21,14 @@ function getLatestUserText(messages: UIMessage[]): string {
   return getTextParts(latest).join(" ").trim();
 }
 
-function buildRoutingSystemPrompt(session: MockAuthSession): string {
+function buildRoutingSystemPrompt(
+  session: MockAuthSession,
+  isOngoingConversation: boolean,
+): string {
   const lines = [
     "You are a routing coordinator for a Leave Management system.",
     "Your job is to classify which specialist agent should handle the user's message, or identify if it is out of scope.",
+    "IMPORTANT: Route based on the intent/meaning of the message regardless of what language it is written in.",
     "",
     "## Specialist Scopes",
     "- employee: Personal time-off queries (e.g., checking own leave balance, listing own requests, submitting or cancelling own leave).",
@@ -42,6 +46,17 @@ function buildRoutingSystemPrompt(session: MockAuthSession): string {
     'If the message is ambiguous but likely related to leave, default to "employee".',
   ];
 
+  if (isOngoingConversation) {
+    lines.push(
+      "",
+      "## Active leave conversation",
+      "The user is already engaged in a leave management conversation.",
+      "A short follow-up message — a date, a date range, a reason phrase, 'yes', 'ok', or any brief reply — is a continuation of that conversation.",
+      "NEVER classify a follow-up message as out_of_scope when a leave conversation is in progress.",
+      'Default to "employee" for any follow-up that is not clearly a manager team action.',
+    );
+  }
+
   if (session.managedEmployees.length > 0) {
     const names = session.managedEmployees.map((e) => e.name).join(", ");
     lines.push(
@@ -55,22 +70,41 @@ function buildRoutingSystemPrompt(session: MockAuthSession): string {
   return lines.join("\n");
 }
 
+function buildRoutingPrompt(messages: UIMessage[], userText: string): string {
+  // For ongoing conversations, include a brief summary of the last few exchanges
+  // so the model can understand that a date / short reply is a follow-up.
+  if (messages.length <= 1) return userText || "(no message)";
+
+  const recentContext = messages
+    .slice(-4)
+    .map((m) => {
+      const text = getTextParts(m).join(" ").slice(0, 120).trim();
+      if (!text) return null;
+      return `${m.role === "user" ? "User" : "Assistant"}: ${text}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  return `Recent conversation:\n${recentContext}\n\nLatest user message to route: ${userText || "(no message)"}`;
+}
+
 export async function routeConversation(
   input: RouteConversationInput,
 ): Promise<CoordinatorDecision> {
   const userText = getLatestUserText(input.messages);
+  const isOngoingConversation = input.messages.length > 1;
 
   const { object } = await generateObject({
     model: input.model,
     schema: routeSchema,
-    system: buildRoutingSystemPrompt(input.session),
-    prompt: userText || "(no message)",
+    system: buildRoutingSystemPrompt(input.session, isOngoingConversation),
+    prompt: buildRoutingPrompt(input.messages, userText),
   });
 
   if (object.specialist === "out_of_scope") {
     return {
       type: "deny",
-      message: `I'm sorry, I can only help with leave requests and team management. I don't have the capability to handle your request. Please contact the relevant department for assistance.`,
+      message: `Sorry, I can only help you with leave-related topics: checking your balance, viewing or submitting time-off requests, cancelling requests, and leave policy questions. For anything else, please contact the relevant department.`,
     };
   }
 

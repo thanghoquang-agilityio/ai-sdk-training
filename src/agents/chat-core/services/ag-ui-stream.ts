@@ -69,6 +69,45 @@ function wrapInterruptTools(tools: ToolSet): ToolSet {
   return result;
 }
 
+type DynamicToolPart = Extract<UIMessage["parts"][number], { type: "dynamic-tool" }>;
+
+// Before convertToModelMessages, inject synthetic output-available results for any
+// frontend tool calls that have no result yet. Without this, the Vercel AI SDK throws
+// AI_MissingToolResultsError on the next turn because the assistant message has a
+// pending collect_date_range call with no matching tool result in the history.
+function sanitizePendingFrontendToolCalls(messages: UIMessage[]): UIMessage[] {
+  return messages.map((msg) => {
+    if (msg.role !== "assistant") return msg;
+    const hasPending = msg.parts.some(
+      (p) =>
+        p.type === "dynamic-tool" &&
+        FRONTEND_TOOL_NAMES.has((p as DynamicToolPart).toolName) &&
+        (p as DynamicToolPart).state === "input-available",
+    );
+    if (!hasPending) return msg;
+    return {
+      ...msg,
+      parts: msg.parts.map((p) => {
+        if (
+          p.type === "dynamic-tool" &&
+          FRONTEND_TOOL_NAMES.has((p as DynamicToolPart).toolName) &&
+          (p as DynamicToolPart).state === "input-available"
+        ) {
+          return {
+            ...(p as DynamicToolPart),
+            state: "output-available" as const,
+            output: {
+              ok: true,
+              message: "Date picker displayed. Waiting for user to select a date range.",
+            },
+          };
+        }
+        return p;
+      }),
+    };
+  });
+}
+
 type StreamSpecialistOptions = {
   runId: string;
   model: LanguageModel;
@@ -99,7 +138,7 @@ export async function streamSpecialistEvents(
     hasCompactedHistory: conversation.hasCompactedHistory,
   });
   const modelMessages = await convertToModelMessages(
-    conversation.recentMessages,
+    sanitizePendingFrontendToolCalls(conversation.recentMessages),
   );
 
   const result = streamText({

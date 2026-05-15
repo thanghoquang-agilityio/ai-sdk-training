@@ -14,7 +14,7 @@ import { invokeDateAgent } from "@/agents/handlers/common/date-specialist";
 import { getTodayIsoDate, parseIsoDateToUtcDay, utcDayToIsoDate } from "@/agents/handlers/common/date";
 import { submitMyTimeOffRequest } from "@/agents/handlers/time-off";
 import { getTextParts } from "@/utils/message";
-import { emitState } from "./ag-ui-types";
+import { emitState, type PendingToolCall } from "./ag-ui-types";
 import { streamSpecialistEvents } from "./ag-ui-stream";
 
 const DATE_MENTION_REGEX =
@@ -196,7 +196,9 @@ function extractLeaveContextFromHistory(messages: UIMessage[]): ExtractedLeaveCo
 
 // Detects when the model asked for dates in plain text instead of calling collect_date_range.
 const DATE_REQUEST_PATTERNS = [
-  /\bstart\s+and\s+end\s+date/i,
+  // Require a request verb before "start and end date" to avoid false-positive on
+  // confirmations like "You have provided the start and end dates as 2026-07-16."
+  /\b(provide|enter|specify|select|what)\b.{0,30}\bstart\s+and\s+end\s+date/i,
   /\bprovide\b.{0,40}\bdate/i,
   /\byyyy-mm-dd\b/i,
   /\bwhen\b.{0,30}\b(leave|vacation|time.?off|day)/i,
@@ -204,7 +206,10 @@ const DATE_REQUEST_PATTERNS = [
   /\bwhat\s+date/i,
   /\bselect\s+(the\s+)?dates?\b/i,
 ];
+// ISO date present in the response → model already has the dates, not requesting them.
+const ISO_DATE_IN_RESPONSE = /\b\d{4}-\d{2}-\d{2}\b/;
 function modelAskedForDatesInText(text: string): boolean {
+  if (ISO_DATE_IN_RESPONSE.test(text)) return false;
   return DATE_REQUEST_PATTERNS.some((p) => p.test(text));
 }
 
@@ -287,32 +292,30 @@ export async function runEmployeeFlow(
     } catch { /* proceed without pre-verify */ }
   }
 
-  // Inject a synthetic verify result so the model sees the exact correct args in conversation history.
-  // This prevents Ollama from hallucinating its own date calculation when calling submit.
-  const streamMessages = preVerified
-    ? [
-        ...uiMessages,
-        {
-          id: `synth-verify-${runId}`,
-          role: "assistant" as const,
-          parts: [
-            {
-              type: "dynamic-tool" as const,
-              toolName: "verify_my_time_off_request",
-              toolCallId: `synth-vc-${runId}`,
-              state: "output-available" as const,
-              input: {
-                leaveType: preVerified.leaveType,
-                startDate: preVerified.startDate,
-                endDate: preVerified.endDate,
-                reason: preVerified.reason,
-              },
-              output: { ok: true, message: "Leave request is valid. Ready to submit." },
-            } as UIMessage["parts"][number],
-          ],
-        } as UIMessage,
-      ]
-    : uiMessages;
+  // When all fields are verified server-side, bypass the model entirely and emit the
+  // interrupt directly. Asking the model to call submit_my_time_off_request is unreliable
+  // with Ollama — it generates conversational text ("Would you like me to submit?") instead
+  // of the tool call, which means wrapInterruptTools never intercepts it.
+  if (preVerified) {
+    const pendingTool: PendingToolCall = {
+      name: "submit_my_time_off_request",
+      args: {
+        leaveType: preVerified.leaveType,
+        startDate: preVerified.startDate,
+        endDate: preVerified.endDate,
+        reason: preVerified.reason,
+      },
+      specialist: "employee",
+      label: "Submit time-off request",
+    };
+    emitState(observer, { phase: "awaiting_confirmation", specialist: "employee", pendingTool });
+    observer.next({
+      type: EventType.CUSTOM,
+      name: "on_interrupt",
+      value: { toolName: pendingTool.name, args: pendingTool.args, label: pendingTool.label },
+    } as CustomEvent);
+    return;
+  }
 
   let capturedText = "";
   let collectDateRangeCalled = false;
@@ -320,8 +323,8 @@ export async function runEmployeeFlow(
   await streamSpecialistEvents(observer, {
     runId,
     model,
-    uiMessages: streamMessages,
-    baseSystemPrompt: buildEmployeeConversationPrompt(session, preVerified ? undefined : preResolvedDates, extractedCtx, preVerified),
+    uiMessages,
+    baseSystemPrompt: buildEmployeeConversationPrompt(session, preResolvedDates, extractedCtx),
     tools: resolveAgentTools("employee", session, {}, model),
     onTextDelta: (delta) => { capturedText += delta; },
     onFrontendTool: (toolName) => { if (toolName === "collect_date_range") collectDateRangeCalled = true; },

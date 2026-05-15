@@ -59,13 +59,21 @@ Current user:
 `.trim();
 
   // When server-side verify already passed — model only needs to call submit.
+  // IMPORTANT: do NOT reference conversation history or a synthetic verify message here.
+  // The args are provided explicitly so the model calls submit_my_time_off_request via
+  // the normal tool-calling path (which wrapInterruptTools can intercept for HITL).
   if (preVerified) {
     return `${base}
 
-### Server-side pre-verification complete
-The conversation above shows that verify_my_time_off_request was already called and returned ok: true.
-Your ONLY action is to call submit_my_time_off_request with the EXACT SAME arguments from the verify call shown in the conversation history above.
-Do NOT recalculate dates. Do NOT write any text. Do NOT call verify_my_time_off_request again. Just call submit_my_time_off_request immediately with the exact args from the verify call above.`;
+### Pre-verification complete — submit immediately
+Server-side validation has already confirmed this request is valid:
+- leaveType: ${preVerified.leaveType}
+- startDate: ${preVerified.startDate}
+- endDate: ${preVerified.endDate}
+- reason: ${preVerified.reason}
+
+Your ONLY action: call submit_my_time_off_request with these exact values.
+Do NOT write any text before the tool call. Do NOT call verify_my_time_off_request again. Just call submit_my_time_off_request immediately.`;
   }
 
   // No dates yet but some context is known — tell the model what's already collected so it
