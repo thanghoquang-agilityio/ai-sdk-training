@@ -84,6 +84,7 @@ export async function runManagerFlow(
   uiMessages: UIMessage[],
   session: MockAuthSession,
   model: LanguageModel,
+  additionalInstructions?: string,
 ): Promise<void> {
   emitState(observer, { phase: "executing", specialist: "manager" });
 
@@ -103,11 +104,15 @@ export async function runManagerFlow(
   let interruptFired = false;
   let accumulatedText = "";
 
+  const baseManagerPrompt = buildManagerConversationPrompt(session);
+
   await streamSpecialistEvents(observer, {
     runId,
     model,
     uiMessages,
-    baseSystemPrompt: buildManagerConversationPrompt(session),
+    baseSystemPrompt: additionalInstructions
+      ? `${baseManagerPrompt}\n\n${additionalInstructions}`
+      : baseManagerPrompt,
     tools: resolveAgentTools("manager", session, undefined, model),
     onTextDelta: (delta) => { accumulatedText += delta; },
     onInterrupt: ({ name, args, label }) => {

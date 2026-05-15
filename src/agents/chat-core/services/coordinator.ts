@@ -3,7 +3,7 @@ import type { LanguageModel, UIMessage } from "ai";
 import { z } from "zod";
 import type { MockAuthSession } from "@/lib/auth/session";
 import type { CoordinatorDecision } from "../types";
-import { getTextParts } from "@/utils/message";
+import { getLatestUserText, getTextParts } from "@/utils/message";
 
 const routeSchema = z.object({
   specialist: z.enum(["employee", "manager", "out_of_scope"]),
@@ -14,12 +14,6 @@ type RouteConversationInput = {
   messages: UIMessage[];
   session: MockAuthSession;
 };
-
-function getLatestUserText(messages: UIMessage[]): string {
-  const latest = [...messages].reverse().find((m) => m.role === "user");
-  if (!latest) return "";
-  return getTextParts(latest).join(" ").trim();
-}
 
 function buildRoutingSystemPrompt(
   session: MockAuthSession,
@@ -34,13 +28,16 @@ function buildRoutingSystemPrompt(
     "- employee: Personal time-off queries (e.g., checking own leave balance, listing own requests, submitting or cancelling own leave).",
     "- manager: Team management (e.g., approving/rejecting requests for direct reports, listing team members, reviewing pending team queue).",
     "",
+    "## Greetings",
+    'A greeting or conversational opener (e.g., "hello", "hi", "hey", "good morning", "how are you") is ALWAYS routed to "employee". Never classify a greeting as out_of_scope.',
+    "",
     "## Out of Scope Examples",
     'Anything NOT directly related to leave management or team attendance is "out_of_scope". Examples:',
     "- Room or equipment booking.",
     "- Payroll or salary queries.",
     "- IT support or technical issues.",
     "- General company information or policies unrelated to leave.",
-    "- Casual chat or non-work related topics.",
+    "- Casual conversation with no leave intent (e.g., 'tell me a joke', 'what is the weather?').",
     "",
     'If the request is clearly unrelated to the specialists above, return "out_of_scope".',
     'If the message is ambiguous but likely related to leave, default to "employee".',
@@ -88,11 +85,22 @@ function buildRoutingPrompt(messages: UIMessage[], userText: string): string {
   return `Recent conversation:\n${recentContext}\n\nLatest user message to route: ${userText || "(no message)"}`;
 }
 
+// Matches pure greeting messages so they bypass the LLM router entirely.
+const GREETING_RE = /^(hi+|hello+|hey+|howdy|good\s+(morning|afternoon|evening)|how\s+are\s+you|what'?s\s+up|greetings)[^a-z]*$/i;
+
 export async function routeConversation(
   input: RouteConversationInput,
 ): Promise<CoordinatorDecision> {
   const userText = getLatestUserText(input.messages);
   const isOngoingConversation = input.messages.length > 1;
+
+  // Short-circuit for greetings — no LLM call needed, delegate based on session role.
+  if (!isOngoingConversation && GREETING_RE.test(userText)) {
+    return {
+      type: "delegate",
+      specialist: input.session.role === "manager" ? "manager" : "employee",
+    };
+  }
 
   const { object } = await generateObject({
     model: input.model,
@@ -104,7 +112,7 @@ export async function routeConversation(
   if (object.specialist === "out_of_scope") {
     return {
       type: "deny",
-      message: `Sorry, I can only help you with leave-related topics: checking your balance, viewing or submitting time-off requests, cancelling requests, and leave policy questions. For anything else, please contact the relevant department.`,
+      message: "Sorry, I can only help you with leave-related topics: checking your balance, viewing or submitting time-off requests, cancelling requests, and answering leave policy questions.",
     };
   }
 

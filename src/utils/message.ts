@@ -5,3 +5,9 @@ export function getTextParts(message: UIMessage): string[] {
     part.type === "text" ? [part.text] : [],
   );
 }
+
+export function getLatestUserText(messages: UIMessage[]): string {
+  const latest = [...messages].reverse().find((m) => m.role === "user");
+  if (!latest) return "";
+  return getTextParts(latest).join(" ").trim();
+}
