@@ -17,12 +17,6 @@ type RuntimeSystemPromptInput = {
   hasCompactedHistory: boolean;
 };
 
-/**
- * compactText helper.
- * @param {string} value
- * @param {number} maxChars
- * @returns {string}
- */
 function compactText(value: string, maxChars: number): string {
   const normalized = value.replace(/\s+/g, " ").trim();
 
@@ -33,29 +27,14 @@ function compactText(value: string, maxChars: number): string {
   return `${normalized.slice(0, maxChars - 3)}...`;
 }
 
-/**
- * Converts value to role label.
- * @param {UIMessage["role"]} role
- * @returns {string}
- */
 function toRoleLabel(role: UIMessage["role"]): string {
   return role === "assistant" ? "Assistant" : "User";
 }
 
-/**
- * Extracts message text.
- * @param {UIMessage} message
- * @returns {string}
- */
 function extractMessageText(message: UIMessage): string {
   return getTextParts(message).join(" ").trim();
 }
 
-/**
- * Builds older context summary.
- * @param {UIMessage[]} messages
- * @returns {string | null}
- */
 function buildOlderContextSummary(messages: UIMessage[]): string | null {
   const lines = messages
     .map((message) => {
@@ -83,11 +62,6 @@ function buildOlderContextSummary(messages: UIMessage[]): string | null {
   return `...${summary.slice(-(OLDER_CONTEXT_TOTAL_MAX_CHARS - 3))}`;
 }
 
-/**
- * Gets latest user text.
- * @param {UIMessage[]} messages
- * @returns {string}
- */
 function getLatestUserText(messages: UIMessage[]): string {
   const latestUserMessage = [...messages]
     .reverse()
@@ -101,10 +75,6 @@ function getLatestUserText(messages: UIMessage[]): string {
   return text || "none";
 }
 
-/**
- * Builds conversation runtime context.
- * @param {ConversationRuntimeContextInput} input
- */
 export function buildConversationRuntimeContext(
   input: ConversationRuntimeContextInput,
 ) {
@@ -125,11 +95,6 @@ export function buildConversationRuntimeContext(
   };
 }
 
-/**
- * Builds runtime system prompt.
- * @param {RuntimeSystemPromptInput} input
- * @returns {string}
- */
 export function buildRuntimeSystemPrompt(input: RuntimeSystemPromptInput): string {
   const runtimeNotes = [
     "## Runtime execution notes",

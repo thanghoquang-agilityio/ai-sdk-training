@@ -1,10 +1,5 @@
 const MS_PER_DAY = 86_400_000;
 
-/**
- * Gets today iso date.
- * @param {string} timeZone
- * @returns {string}
- */
 export function getTodayIsoDate(timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -14,20 +9,10 @@ export function getTodayIsoDate(timeZone: string): string {
   }).format(new Date());
 }
 
-/**
- * Checks whether iso date only.
- * @param {string} value
- * @returns {boolean}
- */
 export function isIsoDateOnly(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-/**
- * Parses iso date to utc day.
- * @param {string} value
- * @returns {number}
- */
 export function parseIsoDateToUtcDay(value: string): number {
   if (!isIsoDateOnly(value)) return Number.NaN;
 
@@ -54,12 +39,6 @@ export function parseIsoDateToUtcDay(value: string): number {
   return Math.floor(utcMs / MS_PER_DAY);
 }
 
-/**
- * Parses relative date to utc day.
- * @param {string} value
- * @param {string} timeZone
- * @returns {number}
- */
 export function parseRelativeDateToUtcDay(value: string, timeZone: string): number {
   const normalized = value
     .trim()
@@ -149,10 +128,7 @@ export function parseRelativeDateToUtcDay(value: string, timeZone: string): numb
   return Number.NaN;
 }
 
-/**
- * Strips time-of-day qualifiers (morning, afternoon, evening, midday, AM, PM, end of)
- * so the remaining string can be parsed as a plain date.
- */
+// Strips time-of-day qualifiers so the remaining string can be parsed as a plain date.
 export function stripTimeOfDay(value: string): string {
   return value
     .replace(/\b(morning|afternoon|evening|midday|mid-day|end\s+of|am|pm)\b/gi, "")
@@ -160,12 +136,6 @@ export function stripTimeOfDay(value: string): string {
     .trim();
 }
 
-/**
- * Parses date input to utc day.
- * @param {string} value
- * @param {string} timeZone
- * @returns {number}
- */
 export function parseDateInputToUtcDay(value: string, timeZone: string): number {
   const trimmed = value.trim();
   const absoluteDay = parseIsoDateToUtcDay(trimmed);
@@ -182,21 +152,10 @@ export function parseDateInputToUtcDay(value: string, timeZone: string): number 
   return Number.NaN;
 }
 
-/**
- * utcDayToIsoDate helper.
- * @param {number} day
- * @returns {string}
- */
 export function utcDayToIsoDate(day: number): string {
   return new Date(day * MS_PER_DAY).toISOString().slice(0, 10);
 }
 
-/**
- * countBusinessDays helper.
- * @param {number} fromDay
- * @param {number} toDay
- * @returns {number}
- */
 export function countBusinessDays(fromDay: number, toDay: number): number {
   let total = 0;
   for (let day = fromDay; day <= toDay; day += 1) {
@@ -206,12 +165,6 @@ export function countBusinessDays(fromDay: number, toDay: number): number {
   return total;
 }
 
-/**
- * formatDateRange helper.
- * @param {string} startDate
- * @param {string} endDate
- * @returns {string}
- */
 export function formatDateRange(startDate: string, endDate: string): string {
   return startDate === endDate ? startDate : `${startDate} to ${endDate}`;
 }
