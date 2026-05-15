@@ -25,8 +25,11 @@ function buildRoutingSystemPrompt(
     "IMPORTANT: Route based on the intent/meaning of the message regardless of what language it is written in.",
     "",
     "## Specialist Scopes",
-    "- employee: Personal time-off queries (e.g., checking own leave balance, listing own requests, submitting or cancelling own leave).",
+    "- employee: Personal leave queries AND leave policy questions (e.g., checking own leave balance, listing own requests, submitting or cancelling own leave, asking about leave entitlements, carryover rules, notice periods, sick leave certificates, half-days, probation restrictions).",
     "- manager: Team management (e.g., approving/rejecting requests for direct reports, listing team members, reviewing pending team queue).",
+    "",
+    "## Always in scope",
+    "Any question about leave policy, leave rules, or leave entitlements is ALWAYS in scope — route to employee.",
     "",
     "## Greetings",
     'A greeting or conversational opener (e.g., "hello", "hi", "hey", "good morning", "how are you") is ALWAYS routed to "employee". Never classify a greeting as out_of_scope.',
@@ -36,7 +39,7 @@ function buildRoutingSystemPrompt(
     "- Room or equipment booking.",
     "- Payroll or salary queries.",
     "- IT support or technical issues.",
-    "- General company information or policies unrelated to leave.",
+    "- General company information or non-leave company policies.",
     "- Casual conversation with no leave intent (e.g., 'tell me a joke', 'what is the weather?').",
     "",
     'If the request is clearly unrelated to the specialists above, return "out_of_scope".',
@@ -88,6 +91,9 @@ function buildRoutingPrompt(messages: UIMessage[], userText: string): string {
 // Matches pure greeting messages so they bypass the LLM router entirely.
 const GREETING_RE = /^(hi+|hello+|hey+|howdy|good\s+(morning|afternoon|evening)|how\s+are\s+you|what'?s\s+up|greetings)[^a-z]*$/i;
 
+// Matches leave-policy intent so the LLM never misclassifies it as out_of_scope.
+const POLICY_RE = /\b(leave\s+policy|policy\s+question|leave\s+rule|leave\s+entitl|carryover|carry[\s-]over|notice\s+period|sick\s+leave|annual\s+leave|time[\s-]off\s+(policy|rule)|half[\s-]day|probation|leave\s+balance|my\s+balance|check.*balance)\b/i;
+
 export async function routeConversation(
   input: RouteConversationInput,
 ): Promise<CoordinatorDecision> {
@@ -100,6 +106,11 @@ export async function routeConversation(
       type: "delegate",
       specialist: input.session.role === "manager" ? "manager" : "employee",
     };
+  }
+
+  // Short-circuit for clear leave/policy intent — never let the LLM misroute these.
+  if (POLICY_RE.test(userText)) {
+    return { type: "delegate", specialist: "employee" };
   }
 
   const { object } = await generateObject({
