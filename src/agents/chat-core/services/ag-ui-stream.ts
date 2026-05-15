@@ -93,18 +93,20 @@ function sanitizePendingFrontendToolCalls(messages: UIMessage[]): UIMessage[] {
           FRONTEND_TOOL_NAMES.has((p as DynamicToolPart).toolName) &&
           (p as DynamicToolPart).state === "input-available"
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { approval, ...rest } = p as DynamicToolPart & { approval?: unknown };
           return {
-            ...(p as DynamicToolPart),
+            ...rest,
             state: "output-available" as const,
             output: {
               ok: true,
               message: "Date picker displayed. Waiting for user to select a date range.",
             },
-          };
+          } as unknown as DynamicToolPart;
         }
         return p;
       }),
-    };
+    } as unknown as UIMessage;
   });
 }
 

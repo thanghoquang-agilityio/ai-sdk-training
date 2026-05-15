@@ -113,10 +113,11 @@ export function useWorkspaceApp(
   // Date picker is shown via:
   // 1. useFrontendTool handler — normal collect_date_range tool call path
   // 2. agentState.phase — past-date pre-stream path in ag-ui-employee.ts
-  // Both paths require messages to exist and loading to be complete, matching the original guard.
+  const lastAgentMessageRole = agentMessages[agentMessages.length - 1]?.role;
   const showDatePicker =
     agentMessages.length > 0 &&
     !isLoading &&
+    lastAgentMessageRole !== "user" &&
     (frontendDatePicker || agentState?.phase === "awaiting_dates");
 
   const collectDateRangeLeaveType =

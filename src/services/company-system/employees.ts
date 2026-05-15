@@ -100,7 +100,7 @@ export async function listEmployeeDirectory(): Promise<EmployeeRecord[]> {
       employeeId: employee.employeeId,
       name: employee.name,
       email: employee.email,
-      avatar: employee.avatar?.trim() || getAvatarUrl(employee.name),
+      avatar: employee.avatar?.trim() || getAvatarUrl(employee.email),
       team: teamNameByTeamId.get(employee.teamId) ?? employee.teamId,
       manager: managerName ?? "Not assigned",
       timeZone: employee.timeZone,

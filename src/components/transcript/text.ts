@@ -1,4 +1,5 @@
 export const BULLET_LIST_LINE_REGEX = /^[-*•]\s+/;
+export const NUMBERED_LIST_LINE_REGEX = /^\d+\.\s+/;
 export const MARKDOWN_TABLE_LINE_REGEX = /^\|.*\|\s*$/;
 export const PIPE_SEPARATED_ROW_LINE_REGEX = /^(?:\|?\s*[^|]+\s*\|){2,}\s*[^|]+\|?\s*$/;
 
@@ -25,6 +26,7 @@ export function stripRedundantStructuredListText(text: string) {
       const trimmedLine = line.trim();
       return (
         !BULLET_LIST_LINE_REGEX.test(trimmedLine) &&
+        !NUMBERED_LIST_LINE_REGEX.test(trimmedLine) &&
         !MARKDOWN_TABLE_LINE_REGEX.test(trimmedLine) &&
         !PIPE_SEPARATED_ROW_LINE_REGEX.test(trimmedLine)
       );

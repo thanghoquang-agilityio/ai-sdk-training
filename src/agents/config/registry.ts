@@ -26,9 +26,6 @@ import {
 } from "@/agents/manager/tools/common/definitions";
 import { DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/specialists/date/tools/definitions";
 
-/* ================================================================
- * AGENT CONFIG — Single source of truth
- * ================================================================ */
 export const AGENT_CONFIG: AgentConfigRegistry = {
   employee: {
     promptVersion: "v1",
@@ -49,7 +46,7 @@ export const AGENT_CONFIG: AgentConfigRegistry = {
     flow: [
       "### Leave Policy Questions",
       "",
-      `RULE: If the user asks HOW something works — carryover, notice periods, entitlements, sick leave rules, medical certificate requirements, probation restrictions, half-days, or any other policy question — ALWAYS call ${EMPLOYEE_TOOL_NAME.SEARCH_LEAVE_POLICY} FIRST. Never answer policy questions from memory or training data.`,
+      `RULE: If the user asks about or mentions policy (e.g., "leave policy question", "how does carryover work", "what is the notice period") — ALWAYS call ${EMPLOYEE_TOOL_NAME.SEARCH_LEAVE_POLICY} FIRST. If the user's message is too vague to form a search query (e.g., just "leave policy question"), ask exactly one clarifying question: "What would you like to know about leave policy?" Do NOT refuse or apply the scope rejection. Never answer policy questions from memory or training data.`,
       `FORBIDDEN: Telling the user to "ask your manager" for a policy question. You have ${EMPLOYEE_TOOL_NAME.SEARCH_LEAVE_POLICY} — use it.`,
       `Example: User asks "How many days can I carry over?" → call ${EMPLOYEE_TOOL_NAME.SEARCH_LEAVE_POLICY} with query "carryover rules" → reply using the returned policy sections.`,
       "",
@@ -111,9 +108,6 @@ export const AGENT_CONFIG: AgentConfigRegistry = {
   },
 };
 
-/* ================================================================
- * Internal lookup tables
- * ================================================================ */
 export const PROMPT_VERSIONS: Record<
   SpecialistAgentName,
   Record<PromptVersion, string>

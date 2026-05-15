@@ -6,6 +6,7 @@ import { ChatEmptyState } from "@/components/chat/empty-state";
 import { CHAT_TRANSCRIPT_COPY } from "@/constants/chat";
 import type { QuickAction } from "@/types/chat";
 import { ChatMessage } from "./message";
+import { MessageAvatar } from "@/components/chat/message-bubble";
 
 type ChatTranscriptProps = {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -81,9 +82,12 @@ export function ChatTranscript({
           ) : null}
 
           {confirmCard ? (
-            <div className="flex justify-start">
-              {confirmCard}
-            </div>
+            <article className="flex gap-3 justify-start">
+              <MessageAvatar initials="" isUser={false} />
+              <div className="min-w-0 max-w-full flex-1">
+                {confirmCard}
+              </div>
+            </article>
           ) : null}
         </div>
       )}
