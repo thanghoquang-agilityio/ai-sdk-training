@@ -1,56 +1,21 @@
 import type { UIMessage } from "ai";
-import type { LeaveType } from "@/lib/db/schema";
 import { runAgent, type AgentRunInput } from "@/agents/chat-core";
 import { buildEmployeeConversationPrompt, type PreResolvedDates } from "@/agents/employee/prompt/conversation";
 import { resolveAgentTools } from "@/agents/config";
 import { invokeDateAgent } from "@/agents/handlers/common/date-specialist";
-import { getTodayIsoDate, parseIsoDateToUtcDay } from "@/agents/handlers/common/date";
+import { getTodayIsoDate } from "@/agents/handlers/common/date";
+import {
+  DATE_MENTION_REGEX,
+  extractLeaveType,
+  isStartDateInPast,
+  tryExtractIsoDatesDirect,
+} from "@/agents/handlers/common/intent";
 import { createPastDateResponse } from "@/agents/chat-core/utils/response";
-import { getTextParts } from "@/utils/message";
-
-// Matches month names, weekday names, relative terms, duration patterns, and ISO dates.
-const DATE_MENTION_REGEX =
-  /\b(\d{4}-\d{2}-\d{2}|january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next\s+\w+|\d+\s+days?\s+(from|starting|beginning))/i;
-
-const LEAVE_TYPE_PATTERNS: Array<[RegExp, LeaveType]> = [
-  [/\bsick\b/i, "sick"],
-  [/\bannual\b/i, "annual"],
-  [/\bpersonal\b/i, "personal"],
-  [/\bunpaid\b/i, "unpaid"],
-];
-
-function extractLeaveType(text: string): LeaveType | null {
-  for (const [regex, type] of LEAVE_TYPE_PATTERNS) {
-    if (regex.test(text)) return type;
-  }
-  return null;
-}
+import { getLatestUserText } from "@/utils/message";
 
 function extractReason(text: string): string | undefined {
   const match = text.match(/\b(?:due to|because of?|for)\b\s+(.+?)(?:[.!?]|$)/i);
   return match?.[1]?.trim() || undefined;
-}
-
-function isStartDateInPast(startDate: string, timeZone: string): boolean {
-  const startDay = parseIsoDateToUtcDay(startDate);
-  const todayDay = parseIsoDateToUtcDay(getTodayIsoDate(timeZone));
-  return Number.isFinite(startDay) && Number.isFinite(todayDay) && startDay < todayDay;
-}
-
-function getLatestUserText(messages: UIMessage[]): string {
-  const latest = [...messages].reverse().find((m) => m.role === "user");
-  if (!latest) return "";
-  return getTextParts(latest).join(" ").trim();
-}
-
-// Directly extract ISO dates without calling the LLM — handles date picker output.
-// "2026-05-25 to 2026-05-26" → range; "2026-05-25" → single day.
-function tryExtractIsoDatesDirect(text: string): PreResolvedDates | undefined {
-  const rangeMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})\b/);
-  if (rangeMatch) return { startDate: rangeMatch[1], endDate: rangeMatch[2] };
-  const singleMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
-  if (singleMatch) return { startDate: singleMatch[1], endDate: singleMatch[1] };
-  return undefined;
 }
 
 async function tryResolveDates(
