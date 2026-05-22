@@ -14,5 +14,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: "/api/chat",
+  matcher: ["/api/chat", "/api/copilotkit/:path*"],
 };

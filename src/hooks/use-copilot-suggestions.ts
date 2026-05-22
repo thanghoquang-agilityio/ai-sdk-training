@@ -1,15 +1,13 @@
 "use client";
 
-import { useConfigureSuggestions, useSuggestions } from "@copilotkit/react-core/v2";
+import { useConfigureSuggestions } from "@copilotkit/react-core/v2";
 import { useMemo } from "react";
 import type { AppRole } from "@/lib/auth/session";
 import type { QuickAction } from "@/types/chat";
-import { getQuickActionsByRole } from "@/constants/chat";
 
-// Static suggestions per role, flowing through CopilotKit's suggestion registry.
-// Each entry maps 1-to-1 with the QuickAction in constants/chat.ts but is read
-// back at runtime via useSuggestions so downstream consumers stay decoupled from
-// the hard-coded constant.
+// Single source of truth for suggestions — used both for CopilotKit's registry
+// and for the UI quick action buttons. Keeping them in one place prevents the
+// registry and the fallback list from drifting out of sync.
 const ROLE_SUGGESTIONS: Record<AppRole, { title: string; message: string }[]> = {
   user: [
     { title: "Check balance", message: "How many annual, sick, and personal leave days do I have left?" },
@@ -26,9 +24,10 @@ const ROLE_SUGGESTIONS: Record<AppRole, { title: string; message: string }[]> = 
 };
 
 /**
- * Registers role-specific suggestions via CopilotKit's suggestion registry
- * (useConfigureSuggestions) and reads them back with useSuggestions.
- * Falls back to the static quick actions list while the registry is loading.
+ * Registers role-specific suggestions via CopilotKit's registry and returns
+ * them as QuickAction[] for the UI. Always derives from ROLE_SUGGESTIONS so
+ * the registry and the displayed buttons are guaranteed to stay in sync — avoids
+ * the flicker caused by useSuggestions resetting to isLoading=true during agent runs.
  */
 export function useCopilotSuggestions(role: AppRole): QuickAction[] {
   useConfigureSuggestions(
@@ -40,13 +39,8 @@ export function useCopilotSuggestions(role: AppRole): QuickAction[] {
     [role],
   );
 
-  const { suggestions, isLoading } = useSuggestions({ agentId: "leaveAssistant" });
-
-  return useMemo(() => {
-    if (!isLoading && suggestions.length > 0) {
-      return suggestions.map((s) => ({ label: s.title, prompt: s.message }));
-    }
-    // Fallback while the registry hasn't hydrated yet
-    return getQuickActionsByRole(role);
-  }, [suggestions, isLoading, role]);
+  return useMemo(
+    () => ROLE_SUGGESTIONS[role].map((s) => ({ label: s.title, prompt: s.message })),
+    [role],
+  );
 }

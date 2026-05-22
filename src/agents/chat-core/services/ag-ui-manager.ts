@@ -1,10 +1,10 @@
 import type { BaseEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
-import type { LanguageModel, UIMessage } from "ai";
+import type { UIMessage } from "ai";
 import type { MockAuthSession } from "@/lib/auth/session";
 import { buildManagerConversationPrompt } from "@/agents/manager/prompt/conversation";
 import { resolveAgentTools } from "@/agents/config";
-import { emitState, emitInterrupt, type PendingToolCall } from "./ag-ui-types";
+import { emitState, emitInterrupt, type PendingToolCall, type AgentRunContext } from "./ag-ui-types";
 import { streamSpecialistEvents } from "./ag-ui-stream";
 import { getTextParts } from "@/utils/message";
 
@@ -66,10 +66,9 @@ export async function runManagerFlow(
   observer: Observer<BaseEvent>,
   runId: string,
   uiMessages: UIMessage[],
-  session: MockAuthSession,
-  model: LanguageModel,
-  additionalInstructions?: string,
+  ctx: AgentRunContext,
 ): Promise<void> {
+  const { session, model, additionalInstructions } = ctx;
   emitState(observer, { phase: "executing", specialist: "manager" });
 
   // Pre-stream: if the latest user message matches the table action button format

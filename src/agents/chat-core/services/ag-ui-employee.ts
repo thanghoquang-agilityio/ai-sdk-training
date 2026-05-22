@@ -1,7 +1,6 @@
 import { EventType, type BaseEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
-import type { LanguageModel, UIMessage } from "ai";
-import type { MockAuthSession } from "@/lib/auth/session";
+import type { UIMessage } from "ai";
 import { buildEmployeeConversationPrompt } from "@/agents/employee/prompt/conversation";
 import { resolveAgentTools } from "@/agents/config";
 import { invokeDateAgent } from "@/agents/handlers/common/date-specialist";
@@ -19,17 +18,16 @@ import {
   tryExtractIsoDatesDirect,
   extractLeaveTypeFromHistory,
 } from "@/agents/handlers/common/intent";
-import { emitState, emitInterrupt, type PendingToolCall } from "./ag-ui-types";
+import { emitState, emitInterrupt, type PendingToolCall, type AgentRunContext } from "./ag-ui-types";
 import { streamSpecialistEvents } from "./ag-ui-stream";
 
 export async function runEmployeeFlow(
   observer: Observer<BaseEvent>,
   runId: string,
   uiMessages: UIMessage[],
-  session: MockAuthSession,
-  model: LanguageModel,
-  additionalInstructions?: string,
+  ctx: AgentRunContext,
 ): Promise<void> {
+  const { session, model, additionalInstructions } = ctx;
   const latestUserText = getLatestUserText(uiMessages);
   let preResolvedDates = tryExtractIsoDatesDirect(latestUserText) ?? tryExtractDurationDates(latestUserText);
 

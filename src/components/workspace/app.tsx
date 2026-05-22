@@ -19,6 +19,7 @@ import { isProductionLike } from "@/lib/runtime-env";
 import type { AIProviderName } from "@/lib/ai-provider";
 import { Text } from "@/components/ui/text";
 import { getInitialsFromName } from "@/utils/avatar";
+import { AUTH_HEADER } from "@/constants/auth";
 import { useProviderSelection } from "@/hooks/use-provider";
 import { useWorkspaceApp } from "@/hooks/use-workspace-app";
 import { useHumanInTheLoop } from "@/hooks/use-human-in-the-loop";
@@ -61,7 +62,11 @@ function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
   const provider = useProviderSelection({ requireOpenAIApiKeyVerification: true });
 
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit" agent="leaveAssistant">
+    <CopilotKit
+        runtimeUrl="/api/copilotkit"
+        agent="leaveAssistant"
+        headers={{ [AUTH_HEADER.role]: selectedRole }}
+      >
       {provider.successMessage ? (
         <Toast
           message={provider.successMessage}

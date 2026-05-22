@@ -1,5 +1,13 @@
 import { EventType, type BaseEvent, type CustomEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
+import type { LanguageModel } from "ai";
+import type { MockAuthSession } from "@/lib/auth/session";
+
+export type AgentRunContext = {
+  session: MockAuthSession;
+  model: LanguageModel;
+  additionalInstructions?: string;
+};
 
 export type AgentPhase = "routing" | "resolving_dates" | "executing" | "awaiting_dates" | "awaiting_confirmation";
 
