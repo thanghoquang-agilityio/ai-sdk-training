@@ -2,9 +2,9 @@ import {
   createStaticAgentResponse,
   logAgent,
   routeConversation,
-} from "@/agents/chat-core";
-import { runManagerAgent } from "@/agents/manager/run";
-import { runEmployeeAgent } from "@/agents/employee/run";
+} from "@/agents/core";
+import { runManagerAgent } from "@/agents/core/legacy/manager-run";
+import { runEmployeeAgent } from "@/agents/core/legacy/employee-run";
 import { API_COMMON_ERROR_COPY, CHAT_API_COPY } from "@/constants/api";
 import { isAppRole, type AppRole } from "@/lib/auth/session";
 import { getMockAuthSession } from "@/lib/auth/session-store";

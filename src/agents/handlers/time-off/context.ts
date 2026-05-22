@@ -8,7 +8,7 @@ import type {
 import { listEmployeeDirectory } from "@/services/company-system/employees";
 import { listTimeOffRequests } from "@/services/company-system/requests";
 import { leaveTypeLabel } from "@/utils/leave";
-import { formatDateRange } from "@/agents/handlers/common/date";
+import { formatDateRange } from "@/agents/memory/date";
 
 export type BalanceRow = {
   leaveType: Exclude<LeaveType, "unpaid">;

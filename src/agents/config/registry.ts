@@ -6,25 +6,25 @@ import type {
 } from "./types";
 
 // ─── Prompt version maps ───
-import { employeePromptVersions } from "@/agents/employee/prompt";
-import { managerPromptVersions } from "@/agents/manager/prompt";
-import { datePromptVersions } from "@/agents/specialists/date/prompt";
+import { employeePromptVersions } from "@/agents/context/employee";
+import { managerPromptVersions } from "@/agents/context/manager";
+import { datePromptVersions } from "@/agents/context/date";
 
 // ─── Tool factory maps ───
-import { employeeToolFactories } from "@/agents/employee/tools";
-import { managerToolFactories } from "@/agents/manager/tools";
-import { dateToolFactories } from "@/agents/specialists/date/tools";
+import { employeeToolFactories } from "@/agents/tools/employee";
+import { managerToolFactories } from "@/agents/tools/manager";
+import { dateToolFactories } from "@/agents/tools/date";
 
 // ─── Tool Definitions ───
 import {
   EMPLOYEE_TOOL_DESCRIPTION,
   EMPLOYEE_TOOL_NAME,
-} from "@/agents/employee/tools/common/definitions";
+} from "@/agents/tools/employee/common/definitions";
 import {
   MANAGER_TOOL_DESCRIPTION,
   MANAGER_TOOL_NAME,
-} from "@/agents/manager/tools/common/definitions";
-import { DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/specialists/date/tools/definitions";
+} from "@/agents/tools/manager/common/definitions";
+import { DATE_AGENT_TOOL_DESCRIPTION } from "@/agents/tools/date/definitions";
 
 export const AGENT_CONFIG: AgentConfigRegistry = {
   employee: {

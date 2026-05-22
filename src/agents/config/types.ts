@@ -1,5 +1,5 @@
 import type { ToolSet, LanguageModel } from "ai";
-import type { AgentName } from "@/agents/chat-core";
+import type { AgentName } from "@/agents/core";
 import type { MockAuthSession } from "@/lib/auth/session";
 
 /** Prompt version follows file naming: system-v1.ts, system-v2.ts, etc. */

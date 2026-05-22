@@ -28,7 +28,7 @@ import { useCopilotRoleInstructions } from "@/hooks/use-copilot-additional-instr
 import type { UseProviderSelectionResult } from "@/types/provider";
 import type { AppRole, MockAuthSession } from "@/lib/auth/session";
 import { agUIMessagesToUIMessages } from "@/utils/message-adapter";
-import type { LeaveAssistantState } from "@/agents/chat-core/services/ag-ui-types";
+import type { LeaveAssistantState } from "@/agents/core/events";
 
 export function useWorkspaceApp(
   authSessions: Record<AppRole, MockAuthSession>,

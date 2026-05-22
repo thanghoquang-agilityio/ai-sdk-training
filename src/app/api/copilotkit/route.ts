@@ -4,7 +4,7 @@ import {
 } from "@copilotkit/runtime";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { LeaveAssistantAgent } from "@/agents/chat-core/services/ag-ui-adapter";
+import { LeaveAssistantAgent } from "@/agents/core/agent";
 import { AUTH_HEADER } from "@/constants/auth";
 import { isAppRole } from "@/lib/auth/session";
 

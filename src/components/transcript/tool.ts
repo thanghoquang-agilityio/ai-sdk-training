@@ -1,6 +1,6 @@
 import { isToolUIPart, type UIMessage } from "ai";
 import { CHAT_TRANSCRIPT_COPY } from "@/constants/chat";
-import type { MessageMetadata } from "@/agents/chat-core";
+import type { MessageMetadata } from "@/agents/core";
 import { formatHumanDateRange } from "@/utils/date";
 import {
   asRecord,
