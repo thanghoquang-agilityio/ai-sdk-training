@@ -173,7 +173,7 @@ export function extractLeaveContextFromHistory(messages: UIMessage[]): Extracted
 
 const DATE_REQUEST_PATTERNS = [
   /\b(provide|enter|specify|select|what)\b.{0,30}\bstart\s+and\s+end\s+date/i,
-  /\bprovide\b.{0,40}\bdate/i,
+  /\bprovide\b.{0,18}\b(the\s+)?dates?\b/i,
   /\byyyy-mm-dd\b/i,
   /\bwhen\b.{0,30}\b(leave|vacation|time.?off|day)/i,
   /\bwhich\s+date/i,

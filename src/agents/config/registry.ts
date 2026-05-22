@@ -44,6 +44,12 @@ export const AGENT_CONFIG: AgentConfigRegistry = {
       ],
     },
     flow: [
+      "### Read Operations",
+      "",
+      `RULE: If the user asks about their balance, remaining days, how many days they have left, or their leave allowance → call ${EMPLOYEE_TOOL_NAME.GET_MY_TIME_OFF_BALANCE} ONCE with NO text before it. Do NOT ask the user — you already have their information. After the tool returns, write 1 short sentence then STOP. Do NOT call it again.`,
+      `RULE: If the user asks to list, view, or show their requests (pending, upcoming, history, all) → call ${EMPLOYEE_TOOL_NAME.LIST_MY_TIME_OFF_REQUESTS} ONCE with NO text before it. After the tool returns, write 1 short sentence then STOP.`,
+      "FORBIDDEN for all read operations: writing any greeting, introduction, or explanation before calling the tool. FORBIDDEN: calling the same read tool more than once per turn.",
+      "",
       "### Leave Policy Questions",
       "",
       `RULE: If the user asks about or mentions policy (e.g., "leave policy question", "how does carryover work", "what is the notice period") — ALWAYS call ${EMPLOYEE_TOOL_NAME.SEARCH_LEAVE_POLICY} FIRST. If the user's message is too vague to form a search query (e.g., just "leave policy question"), ask exactly one clarifying question: "What would you like to know about leave policy?" Do NOT refuse or apply the scope rejection. Never answer policy questions from memory or training data.`,
