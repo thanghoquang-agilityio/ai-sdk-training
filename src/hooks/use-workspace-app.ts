@@ -46,10 +46,10 @@ export function useWorkspaceApp(
     [authSession, selectedRole],
   );
 
+  // openaiApiKey goes here only — must reach the agent but must not appear in
+  // CopilotKit properties (GraphQL variables body).
   // Memoize so useAgentContext's internal useMemo([value]) only re-runs when
   // the content actually changes, not on every parent render.
-  // Omit optional keys entirely (rather than null) so parseAgentConfig receives
-  // string | undefined — matching AgentConfig — not string | null.
   const agentContextValue = useMemo(() => {
     const config: Record<string, string> = {
       provider: provider.requestBody.provider,

@@ -66,6 +66,12 @@ function WorkspaceAppClient({ authRole, authSessions }: WorkspaceAppProps) {
         runtimeUrl="/api/copilotkit"
         agent="leaveAssistant"
         headers={{ [AUTH_HEADER.role]: selectedRole }}
+        properties={{
+          provider: provider.requestBody.provider,
+          ...(provider.requestBody.ollamaBaseUrl && {
+            ollamaBaseUrl: provider.requestBody.ollamaBaseUrl,
+          }),
+        }}
       >
       {provider.successMessage ? (
         <Toast
