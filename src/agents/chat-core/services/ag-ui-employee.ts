@@ -1,4 +1,4 @@
-import { EventType, type BaseEvent, type CustomEvent } from "@ag-ui/core";
+import { EventType, type BaseEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
 import type { LanguageModel, UIMessage } from "ai";
 import type { MockAuthSession } from "@/lib/auth/session";
@@ -19,7 +19,7 @@ import {
   tryExtractIsoDatesDirect,
   extractLeaveTypeFromHistory,
 } from "@/agents/handlers/common/intent";
-import { emitState, type PendingToolCall } from "./ag-ui-types";
+import { emitState, emitInterrupt, type PendingToolCall } from "./ag-ui-types";
 import { streamSpecialistEvents } from "./ag-ui-stream";
 
 export async function runEmployeeFlow(
@@ -110,12 +110,11 @@ export async function runEmployeeFlow(
       specialist: "employee",
       label: "Submit time-off request",
     };
-    emitState(observer, { phase: "awaiting_confirmation", specialist: "employee", pendingTool });
-    observer.next({
-      type: EventType.CUSTOM,
-      name: "on_interrupt",
-      value: { toolName: pendingTool.name, args: pendingTool.args, label: pendingTool.label },
-    } as CustomEvent);
+    emitInterrupt(observer, "employee", {
+      name: pendingTool.name,
+      args: pendingTool.args,
+      label: pendingTool.label,
+    });
     return;
   }
 
@@ -135,16 +134,7 @@ export async function runEmployeeFlow(
     onTextDelta: (delta) => { capturedText += delta; },
     onFrontendTool: (toolName) => { if (toolName === "collect_date_range") collectDateRangeCalled = true; },
     onInterrupt: ({ name, args, label }) => {
-      emitState(observer, {
-        phase: "awaiting_confirmation",
-        specialist: "employee",
-        pendingTool: { name, args, specialist: "employee", label },
-      });
-      observer.next({
-        type: EventType.CUSTOM,
-        name: "on_interrupt",
-        value: { toolName: name, args, label },
-      } as CustomEvent);
+      emitInterrupt(observer, "employee", { name, args, label });
     },
   });
 

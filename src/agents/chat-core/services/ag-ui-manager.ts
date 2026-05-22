@@ -1,10 +1,10 @@
-import { EventType, type BaseEvent, type CustomEvent } from "@ag-ui/core";
+import type { BaseEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
 import type { LanguageModel, UIMessage } from "ai";
 import type { MockAuthSession } from "@/lib/auth/session";
 import { buildManagerConversationPrompt } from "@/agents/manager/prompt/conversation";
 import { resolveAgentTools } from "@/agents/config";
-import { emitState, type PendingToolCall } from "./ag-ui-types";
+import { emitState, emitInterrupt, type PendingToolCall } from "./ag-ui-types";
 import { streamSpecialistEvents } from "./ag-ui-stream";
 import { getTextParts } from "@/utils/message";
 
@@ -62,22 +62,6 @@ function hasMutationInResponse(text: string): boolean {
   return MUTATION_RESPONSE_PATTERNS.some((p) => p.test(text));
 }
 
-function emitMutationInterrupt(
-  observer: Observer<BaseEvent>,
-  pending: Omit<PendingToolCall, "specialist">,
-) {
-  emitState(observer, {
-    phase: "awaiting_confirmation",
-    specialist: "manager",
-    pendingTool: { ...pending, specialist: "manager" },
-  });
-  observer.next({
-    type: EventType.CUSTOM,
-    name: "on_interrupt",
-    value: { toolName: pending.name, args: pending.args, label: pending.label },
-  } as CustomEvent);
-}
-
 export async function runManagerFlow(
   observer: Observer<BaseEvent>,
   runId: string,
@@ -96,7 +80,7 @@ export async function runManagerFlow(
   const directMutation = tryParseDirectMutationPrompt(lastUserText, session);
 
   if (directMutation) {
-    emitMutationInterrupt(observer, directMutation);
+    emitInterrupt(observer, "manager", directMutation);
     return;
   }
 
@@ -117,16 +101,7 @@ export async function runManagerFlow(
     onTextDelta: (delta) => { accumulatedText += delta; },
     onInterrupt: ({ name, args, label }) => {
       interruptFired = true;
-      emitState(observer, {
-        phase: "awaiting_confirmation",
-        specialist: "manager",
-        pendingTool: { name, args, specialist: "manager", label },
-      });
-      observer.next({
-        type: EventType.CUSTOM,
-        name: "on_interrupt",
-        value: { toolName: name, args, label },
-      } as CustomEvent);
+      emitInterrupt(observer, "manager", { name, args, label });
     },
   });
 
@@ -135,7 +110,7 @@ export async function runManagerFlow(
   if (!interruptFired && hasMutationInResponse(accumulatedText)) {
     const fallbackMutation = tryParseDirectMutationPrompt(lastUserText, session);
     if (fallbackMutation) {
-      emitMutationInterrupt(observer, fallbackMutation);
+      emitInterrupt(observer, "manager", fallbackMutation);
     }
   }
 }

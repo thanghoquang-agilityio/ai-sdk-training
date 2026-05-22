@@ -6,6 +6,7 @@ import {
   stepCountIs,
   streamText,
   type LanguageModel,
+  type LanguageModelUsage,
   type StepResult,
   type ToolSet,
   type UIMessage,
@@ -122,6 +123,8 @@ type StreamSpecialistOptions = {
   onFrontendTool?: (toolName: string) => void;
   /** Pre-opened message ID — caller already emitted TEXT_MESSAGE_START; stream continues in it. */
   initialMessageId?: string;
+  /** Called with aggregated token usage once the full stream finishes. */
+  onFinish?: (usage: LanguageModelUsage) => void;
 };
 
 export async function streamSpecialistEvents(
@@ -156,6 +159,9 @@ export async function streamSpecialistEvents(
       delayInMs: runPolicy.streamChunkDelayMs,
       chunking: /[\s\S]/,
     }),
+    onFinish: opts.onFinish
+      ? ({ totalUsage }) => opts.onFinish!(totalUsage)
+      : undefined,
   });
 
   let currentTextMsgId: string | null = opts.initialMessageId ?? null;
@@ -301,13 +307,24 @@ export async function streamSpecialistEvents(
       });
       stepSeq++;
       hasToolCallInCurrentStep = false;
+    } else if (part.type === "finish") {
+      if (currentTextMsgId) {
+        observer.next({
+          type: EventType.TEXT_MESSAGE_END,
+          messageId: currentTextMsgId,
+        });
+        currentTextMsgId = null;
+      }
+    } else if (part.type === "error") {
+      if (currentTextMsgId) {
+        observer.next({
+          type: EventType.TEXT_MESSAGE_END,
+          messageId: currentTextMsgId,
+        });
+        currentTextMsgId = null;
+      }
+      observer.error(part.error);
+      return;
     }
-  }
-
-  if (currentTextMsgId) {
-    observer.next({
-      type: EventType.TEXT_MESSAGE_END,
-      messageId: currentTextMsgId,
-    });
   }
 }

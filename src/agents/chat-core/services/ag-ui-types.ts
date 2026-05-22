@@ -1,4 +1,4 @@
-import { EventType, type BaseEvent } from "@ag-ui/core";
+import { EventType, type BaseEvent, type CustomEvent } from "@ag-ui/core";
 import type { Observer } from "rxjs";
 
 export type AgentPhase = "routing" | "resolving_dates" | "executing" | "awaiting_dates" | "awaiting_confirmation";
@@ -19,4 +19,21 @@ export type LeaveAssistantState = {
 
 export function emitState(observer: Observer<BaseEvent>, state: LeaveAssistantState) {
   observer.next({ type: EventType.STATE_SNAPSHOT, snapshot: state });
+}
+
+export function emitInterrupt(
+  observer: Observer<BaseEvent>,
+  specialist: "employee" | "manager",
+  pending: Omit<PendingToolCall, "specialist">,
+) {
+  emitState(observer, {
+    phase: "awaiting_confirmation",
+    specialist,
+    pendingTool: { ...pending, specialist },
+  });
+  observer.next({
+    type: EventType.CUSTOM,
+    name: "on_interrupt",
+    value: { toolName: pending.name, args: pending.args, label: pending.label },
+  } as CustomEvent);
 }
